@@ -1380,7 +1380,7 @@ const App = () => {
             </div>
 
             <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 text-center">
-                <h3 className="font-black text-purple-800 text-sm mb-1">Version Beta</h3>
+                <h3 className="font-black text-purple-800 text-sm mb-1">Version 1.0.0</h3>
                 <p className="text-[10px] text-purple-600 mb-3">Soutenez le développement de BatiCalcul !</p>
                 <button className="bg-purple-600 text-white px-6 py-2 rounded-full font-bold text-xs shadow-lg shadow-purple-200 active:scale-95 transition-transform">💝 FAIRE UN DON</button>
             </div>
