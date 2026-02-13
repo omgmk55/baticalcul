@@ -1343,52 +1343,132 @@ const App = () => {
         );
     };
 
-    const PlusView = () => (
-        <div className="p-4 space-y-6">
-            <h2 className="text-lg font-black text-gray-800 uppercase tracking-tight border-b-2 border-purple-600 w-fit pr-4">Plus d'options</h2>
+    const PlusView = () => {
+        const [viewMode, setViewMode] = useState('menu'); // 'menu' | 'about'
 
-            <div className="space-y-2">
-                <MenuItem icon={<Settings2 size={18} />} label="Paramètres de l'application" color="text-gray-600" />
-                <MenuItem icon={<Share2 size={18} />} label="Partager BatiCalcul" color="text-blue-600" />
-                <MenuItem icon={<FileText size={18} />} label="Mentions Légales & CGU" color="text-gray-600" />
-                <MenuItem icon={<HelpCircle size={18} />} label="Aide & Support" color="text-emerald-600" />
-            </div>
+        const AboutView = () => (
+            <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                <div className="flex items-center gap-2 border-b-2 border-purple-600 pb-2">
+                    <button onClick={() => setViewMode('menu')} className="text-purple-600"><ChevronLeft size={24} /></button>
+                    <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">À Propos</h2>
+                </div>
 
-            {/* Creator Card */}
-            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-4 rounded-xl border border-blue-200 shadow-sm">
-                <div className="flex items-start gap-3 mb-3">
-                    <div className="bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center font-black text-lg">
-                        JM
+                <div className="bg-white p-6 rounded-2xl border border-purple-100 shadow-sm space-y-6">
+                    <div>
+                        <h3 className="text-lg font-black text-purple-600 mb-2">BatiCalcul</h3>
+                        <p className="text-sm text-gray-600 leading-relaxed text-justify">
+                            BatiCalcul est une plateforme numérique dédiée au secteur du BTP qui facilite le dimensionnement, l'estimation, la gestion de chantier et la planification des travaux, tout en favorisant la collaboration entre les différents acteurs du bâtiment.
+                        </p>
                     </div>
-                    <div className="flex-1">
-                        <h3 className="font-black text-gray-800 text-sm">Créé par Jeancy Mifundu</h3>
-                        <p className="text-[10px] text-blue-600 font-medium">Membre du BenevolApp</p>
+
+                    <div>
+                        <h4 className="font-bold text-gray-900 text-sm uppercase tracking-wide mb-2 flex items-center gap-2">
+                            <TrendingUp size={16} className="text-purple-500" /> Objectifs
+                        </h4>
+                        <ul className="space-y-2">
+                            {[
+                                "Simplifier les calculs techniques et le dimensionnement.",
+                                "Permettre l'estimation du coût et des matériaux.",
+                                "Améliorer le suivi et l'organisation des chantiers.",
+                                "Faciliter la planification et la collaboration.",
+                                "Favoriser l'échange d'expérience entre professionnels."
+                            ].map((item, i) => (
+                                <li key={i} className="flex gap-2 text-xs text-gray-600">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-1.5 shrink-0" />
+                                    {item}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h4 className="font-bold text-gray-900 text-sm uppercase tracking-wide mb-2 flex items-center gap-2">
+                            <User size={16} className="text-purple-500" /> Pour Qui ?
+                        </h4>
+                        <p className="text-xs text-gray-600 leading-relaxed">
+                            Architectes, Ingénieurs BTP, Plombiers, Maçons, Ferrailleurs, Conducteurs de travaux, Électriciens, Entrepreneurs et Artisans du bâtiment.
+                        </p>
+                    </div>
+
+                    <div>
+                        <h4 className="font-bold text-gray-900 text-sm uppercase tracking-wide mb-2 flex items-center gap-2">
+                            <HardHat size={16} className="text-purple-500" /> Services
+                        </h4>
+                        <div className="grid grid-cols-1 gap-2">
+                            {[
+                                "Calcul et dimensionnement des structures",
+                                "Estimation des quantités et coûts",
+                                "Gestion et suivi des chantiers",
+                                "Planification et organisation des travaux",
+                                "Communication et collaboration",
+                                "Partage de solutions techniques"
+                            ].map((item, i) => (
+                                <div key={i} className="bg-purple-50 px-3 py-2 rounded-lg text-xs font-medium text-purple-700 border border-purple-100">
+                                    {item}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
-                <p className="text-xs text-gray-600 mb-3 leading-relaxed">
-                    Pour tous commentaires et suggestions, contactez-le :
-                </p>
-                <a
-                    href="https://wa.me/243905271744"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 bg-green-500 text-white px-4 py-2.5 rounded-full font-bold text-xs shadow-md active:scale-95 transition-transform"
-                >
-                    <MessageSquare size={16} />
-                    CONTACTER VIA WHATSAPP
-                </a>
             </div>
+        );
 
-            <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 text-center">
-                <h3 className="font-black text-purple-800 text-sm mb-1">Version 1.0.0</h3>
-                <p className="text-[10px] text-purple-600 mb-3">Soutenez le développement de BatiCalcul !</p>
-                <button className="bg-purple-600 text-white px-6 py-2 rounded-full font-bold text-xs shadow-lg shadow-purple-200 active:scale-95 transition-transform">💝 FAIRE UN DON</button>
+        if (viewMode === 'about') {
+            return (
+                <div className="p-4 pb-24 h-full">
+                    <AboutView />
+                </div>
+            );
+        }
+
+        return (
+            <div className="p-4 space-y-6 pb-32">
+                <h2 className="text-lg font-black text-gray-800 uppercase tracking-tight border-b-2 border-purple-600 w-fit pr-4">Plus d'options</h2>
+
+                <div className="space-y-2">
+                    <MenuItem icon={<Settings2 size={18} />} label="Paramètres de l'application" color="text-gray-600" />
+                    <MenuItem icon={<Info size={18} />} label="À Propos de BatiCalcul" color="text-purple-600" onClick={() => setViewMode('about')} />
+                    <MenuItem icon={<Share2 size={18} />} label="Partager BatiCalcul" color="text-blue-600" />
+                    <MenuItem icon={<FileText size={18} />} label="Mentions Légales & CGU" color="text-gray-600" />
+                    <MenuItem icon={<HelpCircle size={18} />} label="Aide & Support" color="text-emerald-600" />
+                </div>
+
+                {/* Creator Card */}
+                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-4 rounded-xl border border-blue-200 shadow-sm">
+                    <div className="flex items-start gap-3 mb-3">
+                        <div className="bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center font-black text-lg">
+                            JM
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-black text-gray-800 text-sm">Créé par Jeancy Mifundu</h3>
+                            <p className="text-[10px] text-blue-600 font-medium">Membre du BenevolApp</p>
+                        </div>
+                    </div>
+                    <p className="text-xs text-gray-600 mb-3 leading-relaxed">
+                        Pour tous commentaires et suggestions, contactez-le :
+                    </p>
+                    <a
+                        href="https://wa.me/243905271744"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 bg-green-500 text-white px-4 py-2.5 rounded-full font-bold text-xs shadow-md active:scale-95 transition-transform"
+                    >
+                        <MessageSquare size={16} />
+                        CONTACTER VIA WHATSAPP
+                    </a>
+                </div>
+
+                <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 text-center">
+                    <h3 className="font-black text-purple-800 text-sm mb-1">Version 1.0.0</h3>
+                    <p className="text-[10px] text-purple-600 mb-3">Soutenez le développement de BatiCalcul !</p>
+                    <button className="bg-purple-600 text-white px-6 py-2 rounded-full font-bold text-xs shadow-lg shadow-purple-200 active:scale-95 transition-transform">💝 FAIRE UN DON</button>
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
 
-    const MenuItem = ({ icon, label, color }) => (
-        <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-gray-100 shadow-sm active:bg-gray-50 transition-colors cursor-pointer">
+    const MenuItem = ({ icon, label, color, onClick }) => (
+        <div onClick={onClick} className="flex items-center justify-between bg-white p-4 rounded-xl border border-gray-100 shadow-sm active:bg-gray-50 transition-colors cursor-pointer">
             <div className={`flex items-center gap-3 ${color}`}>
                 {icon}
                 <span className="font-bold text-gray-700 text-xs">{label}</span>
