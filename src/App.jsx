@@ -1345,6 +1345,8 @@ const App = () => {
     const ForumView = () => {
         const [tempMsg, setTempMsg] = useState('');
         const [filterCategory, setFilterCategory] = useState('All');
+        const [topics, setTopics] = useState([]);
+        const [loading, setLoading] = useState(true);
 
         // New Topic Form State
         const [newTopicTitle, setNewTopicTitle] = useState('');
@@ -1353,65 +1355,158 @@ const App = () => {
 
         const categories = ['All', 'Général', 'Chantier', 'Prix', 'Artisans', 'SOS'];
 
-        const handleCreateTopic = () => {
-            if (!newTopicTitle.trim() || !newTopicContent.trim()) return;
+        useEffect(() => {
+            fetchTopics();
+        }, []);
 
-            const newTopic = {
-                id: Date.now(),
-                title: newTopicTitle,
-                author: currentUser ? currentUser.name : 'Anonyme',
-                category: newTopicCategory,
-                date: "À l'instant",
-                likes: 0,
-                replies: 0,
-                tags: [newTopicCategory],
-                messages: [
-                    {
-                        id: 1,
-                        author: currentUser ? currentUser.name : 'Anonyme',
-                        text: newTopicContent,
-                        time: "À l'instant",
-                        isMe: true,
-                        color: 'bg-blue-100 text-blue-600'
-                    }
-                ]
-            };
+        // Real-time subscription could be added here later
+        const fetchTopics = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('topics')
+                    .select('*, author:author_id(username, id)')
+                    .order('created_at', { ascending: false });
 
-            setTopics([newTopic, ...topics]);
-            setNewTopicTitle('');
-            setNewTopicContent('');
-            setForumViewMode('list');
-        };
+                if (error) throw error;
 
-        const handlePostMessage = () => {
-            if (!tempMsg.trim()) return;
-            const newMsg = {
-                id: Date.now(),
-                author: currentUser.name,
-                text: tempMsg,
-                time: 'À l\'instant',
-                isMe: true,
-                color: 'bg-blue-100 text-blue-600'
-            };
+                // Fetch stats for each topic (msg count) could be a separate query or join, 
+                // for now we'll fetch messages count simply or just fetch all messages for active topic.
+                // To keep it simple in this list view, we might not have msg count unless we join messages.
+                // Let's refine the query to include messages count if possible or just map standard data.
+                // Supabase doesn't natively do count in select easily without a view or rpc. 
+                // We'll just fetch topics for now and maybe fetch counts later or separate.
 
-            setTopics(topics.map(t => {
-                if (t.id === activeTopicId) {
-                    return { ...t, messages: [...t.messages, newMsg], replies: t.replies + 1 };
-                }
-                return t;
-            }));
-            setTempMsg('');
-        };
-
-        const handleLogin = () => {
-            if (loginName.trim()) {
-                setCurrentUser({ name: loginName });
-                setShowLogin(false);
+                // MAPPING to frontend structure
+                const mappedTopics = await Promise.all(data.map(async (t) => {
+                    const { count } = await supabase.from('messages').select('*', { count: 'exact', head: true }).eq('topic_id', t.id);
+                    return {
+                        id: t.id,
+                        title: t.title,
+                        author: t.author?.username || 'Anonyme',
+                        category: t.category,
+                        date: new Date(t.created_at).toLocaleDateString('fr-FR'),
+                        likes: 0,
+                        replies: count || 0,
+                        tags: [t.category],
+                        messages: [] // loaded on detail view
+                    };
+                }));
+                setTopics(mappedTopics);
+            } catch (err) {
+                console.error("Error fetching topics:", err);
+            } finally {
+                setLoading(false);
             }
         };
 
-        const activeTopic = topics.find(t => t.id === activeTopicId);
-        const filteredTopics = filterCategory === 'All' ? topics : topics.filter(t => t.category === filterCategory);
+        const handleCreateTopic = async () => {
+            if (!currentUser) return setShowAuthModal(true);
+            if (!newTopicTitle.trim() || !newTopicContent.trim()) return;
+
+            try {
+                // 1. Create Topic
+                const { data: topicData, error: topicError } = await supabase
+                    .from('topics')
+                    .insert({
+                        title: newTopicTitle,
+                        category: newTopicCategory,
+                        author_id: (await supabase.auth.getUser()).data.user.id
+                    })
+                    .select()
+                    .single();
+
+                if (topicError) throw topicError;
+
+                // 2. Create Initial Message
+                const { error: msgError } = await supabase
+                    .from('messages')
+                    .insert({
+                        topic_id: topicData.id,
+                        content: newTopicContent,
+                        author_id: (await supabase.auth.getUser()).data.user.id
+                    });
+
+                if (msgError) throw msgError;
+
+                // Refresh list
+                await fetchTopics();
+                setNewTopicTitle('');
+                setNewTopicContent('');
+                setForumViewMode('list');
+            } catch (err) {
+                console.error("Error creating topic:", err);
+                alert("Erreur lors de la création du sujet.");
+            }
+        };
+
+        const activeTopicData = topics.find(t => t.id === activeTopicId);
+
+        // Fetch messages for active topic
+        const [activeMessages, setActiveMessages] = useState([]);
+        useEffect(() => {
+            if (forumViewMode === 'detail' && activeTopicId) {
+                fetchMessages(activeTopicId);
+            }
+        }, [forumViewMode, activeTopicId]);
+
+        const fetchMessages = async (topicId) => {
+            const { data, error } = await supabase
+                .from('messages')
+                .select('*, author:author_id(username)')
+                .eq('topic_id', topicId)
+                .order('created_at', { ascending: true });
+
+            if (!error && data) {
+                const myId = (await supabase.auth.getUser()).data.user?.id;
+                setActiveMessages(data.map(m => ({
+                    id: m.id,
+                    author: m.author?.username || 'Anonyme',
+                    text: m.content,
+                    time: new Date(m.created_at).toLocaleString('fr-FR'),
+                    isMe: false, // We can't easily check auth.uid in mapped response without session check, handled below
+                    // color logic simplified
+                    color: 'bg-gray-100 text-gray-600',
+                    avatar: (m.author?.username || 'A').charAt(0).toUpperCase()
+                })));
+
+                // Post-process for isMe
+                checkIsMe(data);
+            }
+        };
+
+        const checkIsMe = async (messages) => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setActiveMessages(prev => prev.map((m, i) => ({
+                    ...m,
+                    isMe: messages[i].author_id === user.id,
+                    color: messages[i].author_id === user.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
+                })));
+            }
+        }
+
+        const handlePostMessage = async () => {
+            if (!currentUser) return setShowAuthModal(true);
+            if (!tempMsg.trim()) return;
+
+            try {
+                const { error } = await supabase
+                    .from('messages')
+                    .insert({
+                        topic_id: activeTopicId,
+                        content: tempMsg,
+                        author_id: (await supabase.auth.getUser()).data.user.id
+                    });
+
+                if (error) throw error;
+                setTempMsg('');
+                fetchMessages(activeTopicId); // Refresh chat
+            } catch (err) {
+                console.error("Error posting message:", err);
+            }
+        };
+
+        const activeTopic = activeTopicData ? { ...activeTopicData, messages: activeMessages } : null;
 
         // --- CREATE TOPIC VIEW ---
         if (forumViewMode === 'create') {
@@ -1459,11 +1554,16 @@ const App = () => {
                             />
                         </div>
 
-                        {!currentUser && (
-                            <div className="bg-yellow-50 p-3 rounded-xl border border-yellow-200 text-yellow-700 text-xs font-medium flex items-center gap-2 cursor-pointer hover:bg-yellow-100 transition-colors" onClick={() => setShowAuthModal(true)}>
-                                <Info size={16} /> Connectez-vous pour utiliser votre pseudo. (Mode Anonyme par défaut)
-                            </div>
-                        )}
+
+                        {/* Modified: Only show button for connecting if strictly needed, but form is behind auth guard on list view anyway. 
+                            Actually, we want to show the form but block SUBMIT based on auth? 
+                            User said: "les pouton poser question doit etre visible mais si on clique un pop up qui demande a l'utisateur des se connecte"
+                            So in List View, the button triggers auth.
+                            If we are HERE in Create View, user MUST be logged in. 
+                            Let's add a redirect or strict check if somehow they got here without auth.
+                         */
+                        }
+
 
                         <button
                             onClick={handleCreateTopic}
@@ -1489,9 +1589,7 @@ const App = () => {
                                 <p className="text-[10px] text-gray-500 font-bold">{activeTopic.category}</p>
                             </div>
                         </div>
-                        {!currentUser && (
-                            <button onClick={() => setShowAuthModal(true)} className="text-xs font-bold text-blue-600 underline shrink-0">Se connecter</button>
-                        )}
+                        {/* Remove redundant login link since actions trigger it now */}
                     </div>
 
                     <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-hide">
@@ -1523,23 +1621,21 @@ const App = () => {
 
                     {/* User Input Area */}
                     <div className="pt-2">
-                        {currentUser ? (
-                            <div className="bg-white p-2 rounded-xl border border-gray-200 shadow-lg flex gap-2">
-                                <input
-                                    type="text"
-                                    placeholder={`Répondre en tant que ${currentUser.name}...`}
-                                    className="flex-1 bg-gray-50 p-2 rounded-lg text-xs outline-none focus:bg-white transition-colors"
-                                    value={tempMsg}
-                                    onChange={e => setTempMsg(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && handlePostMessage()}
-                                />
-                                <button onClick={handlePostMessage} className="bg-pink-600 text-white p-2 rounded-lg shadow-md active:scale-95 transition-transform"><Share2 size={16} /></button>
-                            </div>
-                        ) : (
-                            <button onClick={() => setShowAuthModal(true)} className="w-full bg-gray-900 text-white p-3 rounded-xl font-bold text-xs shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform hover:bg-gray-800">
-                                <User size={16} /> SE CONNECTER POUR RÉPONDRE
-                            </button>
-                        )}
+                        {/* Input Area is always visible, but protected on interaction */}
+                        <div className="bg-white p-2 rounded-xl border border-gray-200 shadow-lg flex gap-2">
+                            <input
+                                type="text"
+                                placeholder={currentUser ? `Répondre en tant que ${currentUser.name}...` : "Connectez-vous pour répondre..."}
+                                className="flex-1 bg-gray-50 p-2 rounded-lg text-xs outline-none focus:bg-white transition-colors"
+                                value={tempMsg}
+                                onChange={e => setTempMsg(e.target.value)}
+                                onFocus={() => !currentUser && setShowAuthModal(true)}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') handlePostMessage();
+                                }}
+                            />
+                            <button onClick={handlePostMessage} className="bg-pink-600 text-white p-2 rounded-lg shadow-md active:scale-95 transition-transform"><Share2 size={16} /></button>
+                        </div>
                     </div>
                 </div>
             );
@@ -1557,9 +1653,7 @@ const App = () => {
                         </h2>
                         <p className="text-xs text-gray-500 font-bold ml-1">L'entraide entre pros & particuliers</p>
                     </div>
-                    {!currentUser && (
-                        <button onClick={() => setShowAuthModal(true)} className="text-xs font-bold text-blue-600 underline">Se connecter</button>
-                    )}
+                    {/* Removed top login link */}
                 </div>
 
                 {/* Categories */}
@@ -1577,9 +1671,15 @@ const App = () => {
                     ))}
                 </div>
 
-                {/* Create Topic Button */}
+                {/* Create Topic Button - INTERCEPTED to show AuthModal if not logged in */}
                 <button
-                    onClick={() => setForumViewMode('create')}
+                    onClick={() => {
+                        if (!currentUser) {
+                            setShowAuthModal(true);
+                        } else {
+                            setForumViewMode('create');
+                        }
+                    }}
                     className="w-full bg-gradient-to-r from-pink-600 to-purple-600 text-white p-4 rounded-2xl shadow-lg shadow-pink-200 flex items-center justify-between group active:scale-[0.98] transition-all"
                 >
                     <div className="text-left">

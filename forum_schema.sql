@@ -1,0 +1,38 @@
+-- Enable UUID extension if not already enabled
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+-- Create Topics Table
+CREATE TABLE IF NOT EXISTS public.topics (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    -- Reference public.profiles for easier joining of username
+    author_id UUID REFERENCES public.profiles(id) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+-- Create Messages Table
+CREATE TABLE IF NOT EXISTS public.messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    topic_id UUID REFERENCES public.topics(id) ON DELETE CASCADE NOT NULL,
+    content TEXT NOT NULL,
+    -- Reference public.profiles for easier joining of username
+    author_id UUID REFERENCES public.profiles(id) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+-- Enable Row Level Security
+ALTER TABLE public.topics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+-- Policies for Topics
+-- Everyone can read topics
+CREATE POLICY "Topics are viewable by everyone" ON public.topics FOR
+SELECT USING (true);
+-- Authenticated users can create topics (check against auth.uid())
+CREATE POLICY "Users can create topics" ON public.topics FOR
+INSERT WITH CHECK (auth.uid() = author_id);
+-- Policies for Messages
+-- Everyone can read messages
+CREATE POLICY "Messages are viewable by everyone" ON public.messages FOR
+SELECT USING (true);
+-- Authenticated users can create messages (check against auth.uid())
+CREATE POLICY "Users can create messages" ON public.messages FOR
+INSERT WITH CHECK (auth.uid() = author_id);
