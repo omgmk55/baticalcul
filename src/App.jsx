@@ -1803,13 +1803,21 @@ const App = () => {
     const DevisDQE = () => {
         // --- DATA & STATE ---
         const [viewMode, setViewMode] = useState('list'); // 'list' | 'editor'
-        const [companyInfo, setCompanyInfo] = useState({
-            name: "BatiCalcul Construction",
-            address: "123 Rue du Chantier, 75000 Paris",
-            contact: "contact@baticalkul.com | 01 23 45 67 89",
-            siret: "123 456 789 00012",
-            tva: "FR12345678900"
+        const [companyInfo, setCompanyInfo] = useState(() => {
+            const saved = localStorage.getItem('baticalkul_company_info');
+            return saved ? JSON.parse(saved) : {
+                name: "Votre Entreprise",
+                address: "Adresse de l'entreprise",
+                contact: "email@exemple.com | 01 23 45 67 89",
+                siret: "SIRET 000 000 000 00000",
+                tva: "TVA FR 00 000000000"
+            };
         });
+
+        // Save company info changes to localStorage
+        useEffect(() => {
+            localStorage.setItem('baticalkul_company_info', JSON.stringify(companyInfo));
+        }, [companyInfo]);
 
         const [clientInfo, setClientInfo] = useState({
             name: "Client Exemple",
