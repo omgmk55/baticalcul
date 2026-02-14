@@ -30,7 +30,10 @@ import {
     Lock,
     X,
     Sliders,
-    LogOut
+    LogOut,
+    Shield,
+    Monitor,
+    Smartphone
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
