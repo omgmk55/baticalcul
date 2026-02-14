@@ -21,6 +21,7 @@ import {
     HelpCircle,
     FileText,
     User,
+    Users,
     TrendingUp,
     DollarSign,
     Calendar,
