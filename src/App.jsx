@@ -3407,7 +3407,7 @@ const App = () => {
                             className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-purple-50 transition-colors text-left"
                         >
                             <Shield size={18} className="text-purple-600" />
-                            <span className="text-sm font-bold text-gray-700">Administration</span>
+                            <span className="text-sm font-bold text-gray-700">Tableau de Bord Admin</span>
                         </button>
                         <button
                             onClick={() => {
