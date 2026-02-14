@@ -1,3 +1,68 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer utilities {
+    .no-print {
+        @apply print:hidden;
+    }
+}
+
+/* Print Styles for Professional Quote Export */
+@media print {
+    @page {
+        size: A4;
+        margin: 0;
+    }
+
+    body {
+        background: white;
+        margin: 0;
+        padding: 0;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    /* Hide everything by default */
+    body > * {
+        display: none;
+    }
+
+    /* Only display the printable area */
+    .printable-sheet, .printable-sheet * {
+        display: block;
+    }
+
+    /* Reset the printable sheet styling for print context */
+    .printable-sheet {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        margin: 0;
+        padding: 20mm !important; /* Standard A4 padding */
+        border: none;
+        box-shadow: none;
+        max-width: none !important;
+        background: white;
+    }
+    
+    /* Ensure grid/flex layouts work inside the printable area */
+    .printable-sheet .flex { display: flex; }
+    .printable-sheet .grid { display: grid; }
+    .printable-sheet .hidden { display: none; }
+    
+    /* Hide specific UI elements inside the sheet if marked as no-print */
+    .no-print {
+        display: none !important;
+    }
+}
+
+/* Screen Styles for Quote Paper Effect */
+.printable-sheet {
+    background: white;
+    /* Aspect Ratio for A4 (210mm x 297mm) ~ 1 / 1.414 */
+    min-height: 29.7cm; 
+    position: relative;
+    /* Subtle paper texture or simple white */
+}

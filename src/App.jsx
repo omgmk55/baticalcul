@@ -26,8 +26,13 @@ import {
     Calendar,
     ChevronLeft,
     Printer,
-    Edit2
+    Edit2,
+    Lock,
+    X,
+    Sliders,
+    LogOut
 } from 'lucide-react';
+import { supabase } from './supabaseClient';
 
 // --- CONFIGURATIONS TECHNIQUES ---
 const RATIOS = {
@@ -57,6 +62,9 @@ const BRICK_TYPES = [
     { id: 'b20', label: 'Brique de 20', l: 0.4, h: 0.2, e: 0.20, mortierMult: 1.3 },
 ];
 
+// Admin email constant
+const ADMIN_EMAIL = 'jeancymif@gmail.com';
+
 const BOARD_TYPES = [
     { id: 'p3_15', label: 'Planche 3m x 15cm', l: 3.0, w: 0.15 },
     { id: 'p3_20', label: 'Planche 3m x 20cm', l: 3.0, w: 0.20 },
@@ -73,6 +81,61 @@ const TILE_TYPES = [
     { id: 't60', label: 'Carreau 60x60 cm', l: 0.60, w: 0.60 },
     { id: 't60_120', label: 'Carreau 60x120 cm', l: 0.60, w: 1.20 },
 ];
+
+// --- SHARED COMPONENTS ---
+const TopNavbar = ({ onConnect, currentUser, onProfileClick }) => (
+    <nav className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-sm shadow-sm z-50 px-4 py-3 flex justify-between items-center border-b border-gray-100 h-16">
+        <div className="flex flex-col">
+            <h1 className="text-xl font-black text-gray-900 tracking-tight italic leading-none">BatiCalcul</h1>
+            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Expertise Gros Œuvre</p>
+        </div>
+        {currentUser ? (
+            <button
+                onClick={onProfileClick}
+                className="flex items-center gap-3 hover:bg-gray-50 rounded-full px-3 py-1 transition-colors"
+            >
+                <div className="hidden sm:block text-right">
+                    <p className="text-xs font-bold text-gray-800">{currentUser.name}</p>
+                    <p className="text-[10px] text-gray-500">{currentUser.email}</p>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white font-black text-lg shadow-lg">
+                    {currentUser.name?.charAt(0).toUpperCase() || 'U'}
+                </div>
+            </button>
+        ) : (
+            <button onClick={onConnect} className="bg-blue-600 text-white px-5 py-2 rounded-full font-bold text-xs shadow-md shadow-blue-100 hover:bg-blue-700 active:scale-95 transition-all">
+                Se connecter
+            </button>
+        )}
+    </nav>
+);
+
+const StatCard = ({ title, value, unit, extra, color }) => (
+    <div className={`${color} p-4 rounded-2xl text-white shadow-md relative overflow-hidden transition-all hover:scale-[1.02]`}>
+        <p className="text-[9px] opacity-70 uppercase font-black mb-1 tracking-widest">{title}</p>
+        <div className="flex items-baseline gap-1">
+            <span className="text-xl font-black">{value}</span>
+            <span className="text-[9px] font-bold opacity-80">{unit}{extra}</span>
+        </div>
+    </div>
+);
+
+const NavItem = ({ active, icon, label, onClick }) => (
+    <button onClick={onClick} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-300 ${active ? 'text-blue-600 bg-blue-50 scale-105' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}>
+        {icon}
+        <span className={`text-[9px] font-black uppercase tracking-tighter transition-all ${active ? 'opacity-100' : 'opacity-70'}`}>{label}</span>
+    </button>
+);
+
+const ListItem = ({ title, details, color, onRemove }) => (
+    <div className={`flex justify-between items-center bg-white p-3 rounded-xl border border-gray-100 shadow-sm border-l-4 ${color} transition-all hover:shadow-md`}>
+        <div className="flex flex-col">
+            <span className="font-bold text-gray-800 text-[11px] uppercase tracking-wide">{title}</span>
+            <span className="text-[9px] text-gray-500 font-medium">{details}</span>
+        </div>
+        <button onClick={onRemove} className="p-2 text-red-300 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
+    </div>
+);
 
 const App = () => {
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -105,6 +168,9 @@ const App = () => {
     const [projectType, setProjectType] = useState('Maison');
     const [projectFloors, setProjectFloors] = useState(1);
     const [projectRooms, setProjectRooms] = useState(1);
+
+    // UI State
+    const [plusViewMode, setPlusViewMode] = useState('menu'); // 'menu' | 'about' | 'settings' | 'legal' | 'help' | 'profile'
     const [activeConstructionForms, setActiveConstructionForms] = useState([]);
     const [projectViewMode, setProjectViewMode] = useState('list'); // 'list' | 'editor'
     const [savedProjects, setSavedProjects] = useState(() => {
@@ -115,7 +181,40 @@ const App = () => {
         ];
     });
 
-    const [currentUser, setCurrentUser] = useState(null); // { name: 'Pseudo' }
+    const [currentUser, setCurrentUser] = useState(null); // { name: 'Pseudo', ... }
+    const [showAuthModal, setShowAuthModal] = useState(false);
+    const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+    // Initialize Supabase Auth
+    useEffect(() => {
+        // Check active session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user) {
+                // Fetch profile data
+                supabase.from('profiles').select('username').eq('id', session.user.id).single()
+                    .then(({ data }) => {
+                        setCurrentUser({ ...session.user, name: data?.username || session.user.email.split('@')[0] });
+                    });
+            } else {
+                setCurrentUser(null);
+            }
+        });
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session?.user) {
+                supabase.from('profiles').select('username').eq('id', session.user.id).single()
+                    .then(({ data }) => {
+                        setCurrentUser({ ...session.user, name: data?.username || session.user.email.split('@')[0] });
+                    });
+            } else {
+                setCurrentUser(null);
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
 
     // Save projects to localStorage whenever they change
     useEffect(() => {
@@ -163,6 +262,12 @@ const App = () => {
             setSavedProjects(savedProjects.filter(p => p.id !== projectId));
         }
     };
+
+    // Scroll to Top on Tab Change
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, [activeTab]);
+
     const [forumViewMode, setForumViewMode] = useState('list'); // 'list' | 'detail' | 'create'
     const [activeTopicId, setActiveTopicId] = useState(null);
     const [topics, setTopics] = useState([
@@ -1010,10 +1115,131 @@ const App = () => {
         );
     };
 
+    // ProfileMenu component removed - profile icon now in TopNavbar
+
+    const AuthModal = () => {
+        const [email, setEmail] = useState('');
+        const [password, setPassword] = useState('');
+        const [loading, setLoading] = useState(false);
+        const [error, setError] = useState(null);
+
+        if (!showAuthModal) return null;
+
+        const handleSubmit = async (e) => {
+            e.preventDefault();
+            setLoading(true);
+            setError(null);
+
+            try {
+                if (authMode === 'login') {
+                    const { error } = await supabase.auth.signInWithPassword({
+                        email,
+                        password,
+                    });
+                    if (error) throw error;
+                    setShowAuthModal(false);
+                } else {
+                    const { error } = await supabase.auth.signUp({
+                        email,
+                        password,
+                        options: {
+                            data: {
+                                name: email.split('@')[0]
+                            }
+                        }
+                    });
+                    if (error) throw error;
+                    alert('Inscription réussie ! Vérifiez vos emails pour confirmer.');
+                    setShowAuthModal(false);
+                    setAuthMode('login');
+                }
+            } catch (err) {
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        return (
+            <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                    <div className="p-6">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">
+                                {authMode === 'login' ? 'Connexion' : 'Inscription'}
+                            </h2>
+                            <button onClick={() => setShowAuthModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        {error && (
+                            <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-xs font-bold">
+                                {error}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
+                                <div className="relative">
+                                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                    <input
+                                        type="email"
+                                        className="w-full pl-10 p-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-800 focus:outline-none focus:border-pink-500 transition-colors"
+                                        placeholder="votre@email.com"
+                                        value={email}
+                                        onChange={e => setEmail(e.target.value)}
+                                        autoFocus
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Mot de passe</label>
+                                <div className="relative">
+                                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                    <input
+                                        type="password"
+                                        className="w-full pl-10 p-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-800 focus:outline-none focus:border-pink-500 transition-colors"
+                                        placeholder="••••••••"
+                                        value={password}
+                                        onChange={e => setPassword(e.target.value)}
+                                        required
+                                        minLength={6}
+                                    />
+                                </div>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full bg-gradient-to-r from-pink-600 to-purple-600 text-white p-4 rounded-xl font-bold uppercase tracking-wide shadow-lg shadow-pink-200 hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loading ? 'Chargement...' : (authMode === 'login' ? 'Se connecter' : "S'inscrire")}
+                            </button>
+                        </form>
+
+                        <div className="mt-6 text-center">
+                            <p className="text-xs text-gray-500 font-medium">
+                                {authMode === 'login' ? "Pas encore de compte ?" : "Déjà un compte ?"}
+                                <button
+                                    onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+                                    className="ml-1 text-pink-600 font-bold hover:underline"
+                                >
+                                    {authMode === 'login' ? "S'inscrire" : "Se connecter"}
+                                </button>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     const ForumView = () => {
         const [tempMsg, setTempMsg] = useState('');
-        const [showLogin, setShowLogin] = useState(false);
-        const [loginName, setLoginName] = useState('');
         const [filterCategory, setFilterCategory] = useState('All');
 
         // New Topic Form State
@@ -1130,8 +1356,8 @@ const App = () => {
                         </div>
 
                         {!currentUser && (
-                            <div className="bg-yellow-50 p-3 rounded-xl border border-yellow-200 text-yellow-700 text-xs font-medium flex items-center gap-2">
-                                <Info size={16} /> Vous posterez en tant qu'Anonyme. Connectez-vous pour utiliser votre pseudo.
+                            <div className="bg-yellow-50 p-3 rounded-xl border border-yellow-200 text-yellow-700 text-xs font-medium flex items-center gap-2 cursor-pointer hover:bg-yellow-100 transition-colors" onClick={() => setShowAuthModal(true)}>
+                                <Info size={16} /> Connectez-vous pour utiliser votre pseudo. (Mode Anonyme par défaut)
                             </div>
                         )}
 
@@ -1159,13 +1385,8 @@ const App = () => {
                                 <p className="text-[10px] text-gray-500 font-bold">{activeTopic.category}</p>
                             </div>
                         </div>
-                        {currentUser ? (
-                            <div className="flex items-center gap-2 bg-pink-50 px-3 py-1 rounded-full shrink-0">
-                                <User size={14} className="text-pink-600" />
-                                <span className="text-xs font-bold text-pink-700">{currentUser.name}</span>
-                            </div>
-                        ) : (
-                            <button onClick={() => setShowLogin(!showLogin)} className="text-xs font-bold text-blue-600 underline shrink-0">Login</button>
+                        {!currentUser && (
+                            <button onClick={() => setShowAuthModal(true)} className="text-xs font-bold text-blue-600 underline shrink-0">Se connecter</button>
                         )}
                     </div>
 
@@ -1211,27 +1432,9 @@ const App = () => {
                                 <button onClick={handlePostMessage} className="bg-pink-600 text-white p-2 rounded-lg shadow-md active:scale-95 transition-transform"><Share2 size={16} /></button>
                             </div>
                         ) : (
-                            showLogin ? (
-                                <div className="bg-white p-3 rounded-xl border border-pink-200 shadow-lg animate-in slide-in-from-bottom-2">
-                                    <p className="text-xs font-bold text-gray-700 mb-2 text-center">Identifiez-vous pour répondre</p>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            placeholder="Votre Pseudo..."
-                                            className="flex-1 bg-gray-50 p-2 rounded-lg text-xs border focus:border-pink-500 outline-none"
-                                            autoFocus
-                                            value={loginName}
-                                            onChange={e => setLoginName(e.target.value)}
-                                            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                                        />
-                                        <button onClick={handleLogin} className="bg-pink-600 text-white px-4 py-2 rounded-lg font-bold text-xs shadow-md">OK</button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <button onClick={() => setShowLogin(true)} className="w-full bg-gray-900 text-white p-3 rounded-xl font-bold text-xs shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
-                                    <User size={16} /> SE CONNECTER POUR RÉPONDRE
-                                </button>
-                            )
+                            <button onClick={() => setShowAuthModal(true)} className="w-full bg-gray-900 text-white p-3 rounded-xl font-bold text-xs shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform hover:bg-gray-800">
+                                <User size={16} /> SE CONNECTER POUR RÉPONDRE
+                            </button>
                         )}
                     </div>
                 </div>
@@ -1250,13 +1453,8 @@ const App = () => {
                         </h2>
                         <p className="text-xs text-gray-500 font-bold ml-1">L'entraide entre pros & particuliers</p>
                     </div>
-                    {currentUser ? (
-                        <div className="flex flex-col items-end">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase">Connecté en tant que</span>
-                            <span className="text-xs font-black text-pink-600">{currentUser.name}</span>
-                        </div>
-                    ) : (
-                        <button onClick={() => { setShowLogin(true); setForumViewMode('detail'); /* Hack to show login in detail view (or could be modal) */ }} className="text-xs font-bold text-blue-600 underline">Se connecter</button>
+                    {!currentUser && (
+                        <button onClick={() => setShowAuthModal(true)} className="text-xs font-bold text-blue-600 underline">Se connecter</button>
                     )}
                 </div>
 
@@ -1344,12 +1542,31 @@ const App = () => {
     };
 
     const PlusView = () => {
-        const [viewMode, setViewMode] = useState('menu'); // 'menu' | 'about'
+        // Using viewMode and setPlusViewMode from App scope
+
+        const handleShare = async () => {
+            const shareData = {
+                title: 'BatiCalcul',
+                text: 'Découvrez BatiCalcul, l\'application ultime pour vos chantiers BTP !',
+                url: window.location.href
+            };
+
+            try {
+                if (navigator.share) {
+                    await navigator.share(shareData);
+                } else {
+                    await navigator.clipboard.writeText(window.location.href);
+                    alert('Lien copié dans le presse-papier !');
+                }
+            } catch (err) {
+                console.error('Error sharing:', err);
+            }
+        };
 
         const AboutView = () => (
             <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
                 <div className="flex items-center gap-2 border-b-2 border-purple-600 pb-2">
-                    <button onClick={() => setViewMode('menu')} className="text-purple-600"><ChevronLeft size={24} /></button>
+                    <button onClick={() => setPlusViewMode('menu')} className="text-purple-600"><ChevronLeft size={24} /></button>
                     <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">À Propos</h2>
                 </div>
 
@@ -1413,24 +1630,130 @@ const App = () => {
             </div>
         );
 
-        if (viewMode === 'about') {
-            return (
-                <div className="p-4 pb-24 h-full">
-                    <AboutView />
+        const SettingsView = () => (
+            <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                <div className="flex items-center gap-2 border-b-2 border-gray-600 pb-2">
+                    <button onClick={() => setPlusViewMode('menu')} className="text-gray-600"><ChevronLeft size={24} /></button>
+                    <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Paramètres</h2>
                 </div>
-            );
-        }
+                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold text-gray-700">Notifications</span>
+                        <div className="w-10 h-6 bg-green-500 rounded-full relative cursor-pointer">
+                            <div className="w-4 h-4 bg-white rounded-full absolute top-1 right-1 shadow-sm"></div>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold text-gray-700">Mode Sombre</span>
+                        <div className="w-10 h-6 bg-gray-200 rounded-full relative cursor-pointer">
+                            <div className="w-4 h-4 bg-white rounded-full absolute top-1 left-1 shadow-sm"></div>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold text-gray-700">Unités (Métrique)</span>
+                        <span className="text-xs text-gray-400 font-bold">m, cm, mm</span>
+                    </div>
+                </div>
+                <div className="text-center text-xs text-gray-400 mt-8">
+                    ID App: {Date.now().toString().slice(-6)}
+                </div>
+            </div>
+        );
+
+        const LegalView = () => (
+            <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                <div className="flex items-center gap-2 border-b-2 border-gray-600 pb-2">
+                    <button onClick={() => setPlusViewMode('menu')} className="text-gray-600"><ChevronLeft size={24} /></button>
+                    <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Mentions Légales</h2>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4 text-xs text-gray-600 text-justify">
+                    <p><strong>Éditeur :</strong> BatiCalcul est une application développée à titre personnel.</p>
+                    <p><strong>Hébergement :</strong> Ce site est hébergé sur GitHub Pages.</p>
+
+                    <p><strong>Données Personnelles :</strong> Les données de vos projets sont stockées localement sur votre appareil (LocalStorage). Aucune donnée n'est envoyée vers un serveur distant, sauf si vous utilisez les fonctionnalités de partage.</p>
+                </div>
+            </div>
+        );
+
+        const HelpView = () => (
+            <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                <div className="flex items-center gap-2 border-b-2 border-emerald-600 pb-2">
+                    <button onClick={() => setPlusViewMode('menu')} className="text-emerald-600"><ChevronLeft size={24} /></button>
+                    <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Aide & Support</h2>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm space-y-4">
+                    <h3 className="font-bold text-emerald-800 text-sm">Besoin d'aide ?</h3>
+                    <p className="text-xs text-gray-600">
+                        Si vous rencontrez un problème ou avez une question sur l'utilisation de l'application, n'hésitez pas à nous contacter.
+                    </p>
+                    <div className="grid gap-2">
+                        <button className="bg-emerald-50 text-emerald-700 p-3 rounded-lg text-xs font-bold text-left flex items-center gap-2">
+                            <MessageSquare size={16} /> FAQ (Foire Aux Questions)
+                        </button>
+                        <button className="bg-emerald-50 text-emerald-700 p-3 rounded-lg text-xs font-bold text-left flex items-center gap-2">
+                            <FileText size={16} /> Guide d'utilisation
+                        </button>
+                        <a href="mailto:support@baticalcul.com" className="bg-emerald-50 text-emerald-700 p-3 rounded-lg text-xs font-bold text-left flex items-center justify-between">
+                            <span className="flex items-center gap-2"><Settings2 size={16} /> Contacter le support</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const ProfileView = () => (
+            <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 h-full">
+                <div className="flex items-center gap-2 border-b-2 border-pink-600 pb-2">
+                    <button onClick={() => setPlusViewMode('menu')} className="text-pink-600"><ChevronLeft size={24} /></button>
+                    <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Mon Profil</h2>
+                </div>
+
+                <div className="bg-white p-8 rounded-2xl border border-pink-100 shadow-sm flex flex-col items-center gap-6">
+                    <div className="w-24 h-24 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center text-white text-4xl font-black shadow-xl ring-4 ring-pink-50">
+                        {currentUser?.name?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                    <div className="text-center">
+                        <h3 className="text-2xl font-black text-gray-800">{currentUser?.name || 'Utilisateur'}</h3>
+                        <p className="text-sm text-purple-600 font-bold bg-purple-50 px-3 py-1 rounded-full mt-2 inline-block">Membre BatiCalcul</p>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    <button className="w-full bg-white border border-gray-200 p-4 rounded-xl flex items-center justify-between hover:bg-gray-50 transition-colors">
+                        <span className="flex items-center gap-3 text-gray-700 font-bold"><User size={20} className="text-gray-400" /> Modifier le profil</span>
+                        <ChevronRight size={16} className="text-gray-300" />
+                    </button>
+                    <button className="w-full bg-white border border-gray-200 p-4 rounded-xl flex items-center justify-between hover:bg-gray-50 transition-colors">
+                        <span className="flex items-center gap-3 text-gray-700 font-bold"><Settings2 size={20} className="text-gray-400" /> Préférences</span>
+                        <ChevronRight size={16} className="text-gray-300" />
+                    </button>
+
+                    <button onClick={async () => { await supabase.auth.signOut(); setCurrentUser(null); setActiveTab('dashboard'); }} className="w-full bg-red-50 text-red-600 p-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors mt-8 shadow-sm">
+                        <LogOut size={20} />
+                        Se déconnecter
+                    </button>
+                </div>
+            </div>
+        );
+
+
+        if (plusViewMode === 'about') return <div className="p-4 pb-24 h-full"><AboutView /></div>;
+        if (plusViewMode === 'settings') return <div className="p-4 pb-24 h-full"><SettingsView /></div>;
+        if (plusViewMode === 'legal') return <div className="p-4 pb-24 h-full"><LegalView /></div>;
+        if (plusViewMode === 'help') return <div className="p-4 pb-24 h-full"><HelpView /></div>;
+        if (plusViewMode === 'profile') return <div className="p-4 pb-24 h-full"><ProfileView /></div>;
 
         return (
             <div className="p-4 space-y-6 pb-32">
                 <h2 className="text-lg font-black text-gray-800 uppercase tracking-tight border-b-2 border-purple-600 w-fit pr-4">Plus d'options</h2>
 
                 <div className="space-y-2">
-                    <MenuItem icon={<Settings2 size={18} />} label="Paramètres de l'application" color="text-gray-600" />
-                    <MenuItem icon={<Info size={18} />} label="À Propos de BatiCalcul" color="text-purple-600" onClick={() => setViewMode('about')} />
-                    <MenuItem icon={<Share2 size={18} />} label="Partager BatiCalcul" color="text-blue-600" />
-                    <MenuItem icon={<FileText size={18} />} label="Mentions Légales & CGU" color="text-gray-600" />
-                    <MenuItem icon={<HelpCircle size={18} />} label="Aide & Support" color="text-emerald-600" />
+                    {currentUser && <MenuItem icon={<User size={18} />} label="Mon Profil" color="text-pink-600" onClick={() => setPlusViewMode('profile')} />}
+                    <MenuItem icon={<Settings2 size={18} />} label="Paramètres de l'application" color="text-gray-600" onClick={() => setPlusViewMode('settings')} />
+                    <MenuItem icon={<Info size={18} />} label="À Propos de BatiCalcul" color="text-purple-600" onClick={() => setPlusViewMode('about')} />
+                    <MenuItem icon={<Share2 size={18} />} label="Partager BatiCalcul" color="text-blue-600" onClick={handleShare} />
+                    <MenuItem icon={<FileText size={18} />} label="Mentions Légales & CGU" color="text-gray-600" onClick={() => setPlusViewMode('legal')} />
+                    <MenuItem icon={<HelpCircle size={18} />} label="Aide & Support" color="text-emerald-600" onClick={() => setPlusViewMode('help')} />
                 </div>
 
                 {/* Creator Card */}
@@ -1461,7 +1784,7 @@ const App = () => {
                 <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 text-center">
                     <h3 className="font-black text-purple-800 text-sm mb-1">Version 1.0.0</h3>
                     <p className="text-[10px] text-purple-600 mb-3">Soutenez le développement de BatiCalcul !</p>
-                    <button className="bg-purple-600 text-white px-6 py-2 rounded-full font-bold text-xs shadow-lg shadow-purple-200 active:scale-95 transition-transform">💝 FAIRE UN DON</button>
+                    <button onClick={() => alert("Cette fonctionnalité sera bientôt disponible !")} className="bg-purple-600 text-white px-6 py-2 rounded-full font-bold text-xs shadow-lg shadow-purple-200 active:scale-95 transition-transform">💝 FAIRE UN DON</button>
                 </div>
             </div>
         );
@@ -1483,12 +1806,24 @@ const App = () => {
         const [companyInfo, setCompanyInfo] = useState({
             name: "BatiCalcul Construction",
             address: "123 Rue du Chantier, 75000 Paris",
-            contact: "contact@baticalkul.com | 01 23 45 67 89"
+            contact: "contact@baticalkul.com | 01 23 45 67 89",
+            siret: "123 456 789 00012",
+            tva: "FR12345678900"
         });
 
         const [clientInfo, setClientInfo] = useState({
-            name: "Client Excemple",
+            name: "Client Exemple",
             address: "Projet Villa R+1",
+            email: "client@email.com",
+            tel: "06 12 34 56 78"
+        });
+
+        // Quote metadata
+        const [quoteMetadata, setQuoteMetadata] = useState({
+            numero: `DEV-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
+            date: new Date().toISOString().split('T')[0],
+            validite: 30, // jours
+            tauxTVA: 20 // %
         });
 
         const [isEditingHeader, setIsEditingHeader] = useState(false);
@@ -1497,8 +1832,11 @@ const App = () => {
         const [savedQuotes, setSavedQuotes] = useState([]);
         const [showSaveModal, setShowSaveModal] = useState(false);
         const [showLoadModal, setShowLoadModal] = useState(false);
+        const [showTypeModal, setShowTypeModal] = useState(false);
         const [quoteName, setQuoteName] = useState('');
+        const [quoteType, setQuoteType] = useState('dqe'); // 'estimatif' | 'quantitatif' | 'dqe'
 
+        // Load saved quotes on mount
         // Load saved quotes on mount
         useEffect(() => {
             const saved = localStorage.getItem('baticalkul_devis_saves');
@@ -1572,6 +1910,7 @@ const App = () => {
                 id: Date.now(),
                 name: quoteName,
                 date: new Date().toLocaleDateString(),
+                quoteType, // Save type
                 clientInfo: { ...clientInfo },
                 companyInfo: { ...companyInfo },
                 items: JSON.parse(JSON.stringify(items)), // Deep copy
@@ -1590,6 +1929,7 @@ const App = () => {
                 setClientInfo(quote.clientInfo);
                 setCompanyInfo(quote.companyInfo || companyInfo);
                 setItems(quote.items);
+                setQuoteType(quote.quoteType || 'dqe');
                 setShowLoadModal(false);
                 setViewMode('editor');
             }
@@ -1606,9 +1946,15 @@ const App = () => {
 
         const handleCreateNew = () => {
             // Reset to defaults
-            setClientInfo({ name: "Client Exemple", address: "Adresse du chantier" });
+            setClientInfo({ name: "Client Exemple", address: "Adresse du chantier", email: "client@email.com", tel: "06 12 34 56 78" });
             // Unlock all items to re-sync with project
             setItems(items.map(i => ({ ...i, locked: false })));
+            setShowTypeModal(true);
+        };
+
+        const handleSelectType = (type) => {
+            setQuoteType(type);
+            setShowTypeModal(false);
             setViewMode('editor');
         };
 
@@ -1622,6 +1968,55 @@ const App = () => {
                             <h2 className="text-xl font-black text-gray-800 uppercase tracking-tight">Mes Devis</h2>
                         </div>
                     </header>
+
+                    {/* TYPE SELECTION MODAL */}
+                    {showTypeModal && (
+                        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+                            <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 duration-200">
+                                <h3 className="text-xl font-black text-gray-900 mb-6 text-center uppercase tracking-tight">Type de Devis</h3>
+                                <div className="space-y-3">
+                                    <button
+                                        onClick={() => handleSelectType('estimatif')}
+                                        className="w-full bg-white border-2 border-blue-100 hover:border-blue-500 hover:bg-blue-50 text-blue-900 p-4 rounded-xl font-bold flex items-center justify-between group transition-all"
+                                    >
+                                        <div className="text-left">
+                                            <span className="block text-sm uppercase tracking-wider text-blue-400 font-black mb-1">STANDARD</span>
+                                            <span className="text-lg">Devis Estimatif</span>
+                                        </div>
+                                        <ChevronRight size={20} className="text-blue-300 group-hover:text-blue-600 transition-colors" />
+                                    </button>
+
+                                    <button
+                                        onClick={() => handleSelectType('quantitatif')}
+                                        className="w-full bg-white border-2 border-emerald-100 hover:border-emerald-500 hover:bg-emerald-50 text-emerald-900 p-4 rounded-xl font-bold flex items-center justify-between group transition-all"
+                                    >
+                                        <div className="text-left">
+                                            <span className="block text-sm uppercase tracking-wider text-emerald-400 font-black mb-1">MÉTRÉ</span>
+                                            <span className="text-lg">Devis Quantitatif</span>
+                                        </div>
+                                        <ChevronRight size={20} className="text-emerald-300 group-hover:text-emerald-600 transition-colors" />
+                                    </button>
+
+                                    <button
+                                        onClick={() => handleSelectType('dqe')}
+                                        className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4 rounded-xl font-bold flex items-center justify-between group shadow-lg shadow-purple-200 hover:shadow-xl hover:scale-[1.02] transition-all"
+                                    >
+                                        <div className="text-left">
+                                            <span className="block text-xs uppercase tracking-wider text-purple-200 font-black mb-1">COMPLET</span>
+                                            <span className="text-lg">DQE (Quantitatif + Estimatif)</span>
+                                        </div>
+                                        <ChevronRight size={20} className="text-white/70 group-hover:text-white transition-colors" />
+                                    </button>
+                                </div>
+                                <button
+                                    onClick={() => setShowTypeModal(false)}
+                                    className="w-full mt-6 text-gray-400 font-bold text-xs hover:text-gray-600 transition-colors"
+                                >
+                                    ANNULER
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* CREATE NEW CARD */}
                     <button
@@ -1726,21 +2121,35 @@ const App = () => {
                 {/* DEVIS PAPER SHEET */}
                 <div className="bg-white p-6 md:p-8 rounded-none md:rounded-xl shadow-lg border border-gray-200 text-gray-800 max-w-4xl mx-auto printable-sheet">
 
+                    {/* Titre DEVIS + N° */}
+                    <div className="text-center mb-6 border-b-4 border-blue-600 pb-4">
+                        <h1 className="text-4xl font-black text-blue-900 uppercase tracking-wide">Devis</h1>
+                        <p className="text-sm text-gray-500 mt-2 font-bold">N° {quoteMetadata.numero}</p>
+                        <p className="text-xs text-gray-400">Date d'émission : {new Date(quoteMetadata.date).toLocaleDateString('fr-FR')}</p>
+                        <p className="text-xs text-gray-400">Validité : {quoteMetadata.validite} jours</p>
+                    </div>
+
                     {/* EN-TÊTE ENTREPRISE / CLIENT */}
                     <div className="flex flex-col md:flex-row justify-between gap-8 mb-8 border-b-2 border-gray-100 pb-6">
                         {/* Company Info */}
                         <div className="flex-1">
                             {isEditingHeader ? (
                                 <div className="space-y-2">
-                                    <input value={companyInfo.name} onChange={e => setCompanyInfo({ ...companyInfo, name: e.target.value })} className="w-full font-bold border rounded p-1" />
-                                    <textarea value={companyInfo.address} onChange={e => setCompanyInfo({ ...companyInfo, address: e.target.value })} className="w-full text-sm border rounded p-1" />
-                                    <input value={companyInfo.contact} onChange={e => setCompanyInfo({ ...companyInfo, contact: e.target.value })} className="w-full text-xs border rounded p-1" />
+                                    <input value={companyInfo.name} onChange={e => setCompanyInfo({ ...companyInfo, name: e.target.value })} className="w-full font-bold border rounded p-1 text-sm" placeholder="Nom entreprise" />
+                                    <textarea value={companyInfo.address} onChange={e => setCompanyInfo({ ...companyInfo, address: e.target.value })} className="w-full text-sm border rounded p-1" placeholder="Adresse" />
+                                    <input value={companyInfo.contact} onChange={e => setCompanyInfo({ ...companyInfo, contact: e.target.value })} className="w-full text-xs border rounded p-1" placeholder="Contact" />
+                                    <input value={companyInfo.siret} onChange={e => setCompanyInfo({ ...companyInfo, siret: e.target.value })} className="w-full text-xs border rounded p-1" placeholder="SIRET" />
+                                    <input value={companyInfo.tva} onChange={e => setCompanyInfo({ ...companyInfo, tva: e.target.value })} className="w-full text-xs border rounded p-1" placeholder="N° TVA" />
                                 </div>
                             ) : (
                                 <div>
-                                    <h1 className="text-2xl font-black text-blue-900 uppercase mb-1">{companyInfo.name}</h1>
+                                    <h2 className="text-2xl font-black text-blue-900 uppercase mb-1">{companyInfo.name}</h2>
                                     <p className="text-sm text-gray-600 whitespace-pre-line">{companyInfo.address}</p>
                                     <p className="text-xs text-gray-500 mt-2 font-medium">{companyInfo.contact}</p>
+                                    <div className="mt-3 text-xs text-gray-400 space-y-0.5">
+                                        <p>SIRET : {companyInfo.siret}</p>
+                                        <p>TVA : {companyInfo.tva}</p>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -1756,14 +2165,19 @@ const App = () => {
                             <h3 className="text-xs font-bold text-gray-500 uppercase mb-2">Client</h3>
                             {isEditingHeader ? (
                                 <div className="space-y-2">
-                                    <input value={clientInfo.name} onChange={e => setClientInfo({ ...clientInfo, name: e.target.value })} className="w-full font-bold border rounded p-1" />
-                                    <input value={clientInfo.address} onChange={e => setClientInfo({ ...clientInfo, address: e.target.value })} className="w-full text-sm border rounded p-1" />
+                                    <input value={clientInfo.name} onChange={e => setClientInfo({ ...clientInfo, name: e.target.value })} className="w-full font-bold border rounded p-1 text-sm" placeholder="Nom client" />
+                                    <input value={clientInfo.address} onChange={e => setClientInfo({ ...clientInfo, address: e.target.value })} className="w-full text-sm border rounded p-1" placeholder="Adresse chantier" />
+                                    <input value={clientInfo.email} onChange={e => setClientInfo({ ...clientInfo, email: e.target.value })} className="w-full text-xs border rounded p-1" placeholder="Email" />
+                                    <input value={clientInfo.tel} onChange={e => setClientInfo({ ...clientInfo, tel: e.target.value })} className="w-full text-xs border rounded p-1" placeholder="Téléphone" />
                                 </div>
                             ) : (
                                 <div>
                                     <p className="font-bold text-lg text-gray-900">{clientInfo.name}</p>
                                     <p className="text-sm text-gray-600">{clientInfo.address}</p>
-                                    <p className="text-xs text-gray-500 mt-1">Date: {new Date().toLocaleDateString()}</p>
+                                    <div className="mt-2 text-xs text-gray-500 space-y-0.5">
+                                        <p>{clientInfo.email}</p>
+                                        <p>{clientInfo.tel}</p>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -1772,61 +2186,89 @@ const App = () => {
                     {/* TABLEAU DEVIS */}
                     <div className="overflow-x-auto">
                         <table className="w-full mb-8 text-sm">
-                            <thead className="bg-blue-50 text-blue-900">
+                            <thead className="bg-blue-50 text-blue-900 border-b-2 border-blue-100">
                                 <tr>
-                                    <th className="py-3 px-2 text-left w-12 rounded-l-lg">N°</th>
-                                    <th className="py-3 px-2 text-left">Désignation des travaux</th>
-                                    <th className="py-3 px-2 text-center w-16">Unité</th>
+                                    <th className="py-3 px-2 text-left w-16">Réf</th>
+                                    <th className="py-3 px-2 text-left">Désignation</th>
+                                    <th className="py-3 px-2 text-center w-16">U</th>
                                     <th className="py-3 px-2 text-center w-20">Qté</th>
-                                    <th className="py-3 px-2 text-right w-24">P.U ($)</th>
-                                    <th className="py-3 px-2 text-right w-28 rounded-r-lg">Total ($)</th>
+                                    {quoteType !== 'quantitatif' && (
+                                        <>
+                                            <th className="py-3 px-2 text-right w-24">P.U HT</th>
+                                            <th className="py-3 px-2 text-right w-28">Total HT</th>
+                                        </>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {items.map((item, index) => (
-                                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="py-3 px-2 text-gray-500 font-medium">{index + 1}</td>
-                                        <td className="py-3 px-2">
-                                            <span className="font-bold text-gray-800">{item.section}</span>
-                                            <span className="block text-xs text-gray-500">{item.label}</span>
-                                        </td>
-                                        <td className="py-3 px-2 text-center text-gray-500 text-xs">{item.unit}</td>
-                                        <td className="py-3 px-2 text-center">
-                                            <input
-                                                type="number"
-                                                value={item.qty}
-                                                onChange={(e) => handleQtyChange(item.id, e.target.value)}
-                                                className="w-16 text-center bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 font-medium outline-none"
-                                            />
-                                        </td>
-                                        <td className="py-3 px-2 text-right">
-                                            <input
-                                                type="number"
-                                                value={item.price}
-                                                onChange={(e) => handlePriceChange(item.id, e.target.value)}
-                                                className="w-20 text-right bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none"
-                                            />
-                                        </td>
-                                        <td className="py-3 px-2 text-right font-bold text-gray-900">
-                                            {(item.qty * item.price).toLocaleString()}
-                                        </td>
-                                    </tr>
-                                ))}
+                                {[...new Set(items.map(i => i.section))].map((section, sIndex) => {
+                                    const sectionItems = items.filter(i => i.section === section);
+                                    return (
+                                        <React.Fragment key={section}>
+                                            <tr className="bg-gray-50/50">
+                                                <td colSpan={quoteType !== 'quantitatif' ? "6" : "4"} className="py-2 px-3 font-bold text-blue-800 text-xs uppercase tracking-wider border-t border-gray-100 mt-4">
+                                                    Lot {sIndex + 1} : {section}
+                                                </td>
+                                            </tr>
+                                            {sectionItems.map((item, index) => (
+                                                <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                                                    <td className="py-2 px-3 text-gray-400 text-xs">{sIndex + 1}.{index + 1}</td>
+                                                    <td className="py-2 px-2 font-medium text-gray-700">{item.label}</td>
+                                                    <td className="py-2 px-2 text-center text-gray-500 text-xs">{item.unit}</td>
+                                                    <td className="py-2 px-2 text-center">
+                                                        <input
+                                                            type="number"
+                                                            value={item.qty}
+                                                            onChange={(e) => handleQtyChange(item.id, e.target.value)}
+                                                            className="w-16 text-center bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 font-medium outline-none"
+                                                        />
+                                                    </td>
+                                                    {quoteType !== 'quantitatif' && (
+                                                        <>
+                                                            <td className="py-2 px-2 text-right text-gray-600">
+                                                                <input
+                                                                    type="number"
+                                                                    value={item.price}
+                                                                    onChange={(e) => handlePriceChange(item.id, e.target.value)}
+                                                                    className="w-20 text-right bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none"
+                                                                />
+                                                            </td>
+                                                            <td className="py-2 px-2 text-right font-bold text-gray-800">
+                                                                {(item.qty * item.price).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                                                            </td>
+                                                        </>
+                                                    )}
+                                                </tr>
+                                            ))}
+                                        </React.Fragment>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
 
-                    {/* TOTAL */}
-                    <div className="flex flex-col items-end mb-8">
-                        <div className="bg-blue-600 text-white p-4 rounded-xl shadow-lg w-full md:w-64">
-                            <div className="flex justify-between items-center mb-1">
-                                <span className="text-blue-100 text-sm font-medium">Total Estimatif</span>
-                            </div>
-                            <div className="text-3xl font-black text-right tracking-tight">
-                                {totalGeneral.toLocaleString()} $
+                    {/* TOTAL FINANCIAL SUMMARY */}
+                    {quoteType !== 'quantitatif' && (
+                        <div className="flex flex-col items-end mb-8 space-y-2">
+                            <div className="w-full md:w-80 space-y-2">
+                                <div className="flex justify-between text-gray-600 text-sm">
+                                    <span>Total HT</span>
+                                    <span className="font-bold">{items.reduce((sum, i) => sum + (i.qty * i.price), 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
+                                </div>
+                                <div className="flex justify-between text-gray-600 text-sm">
+                                    <span>TVA ({quoteMetadata.tauxTVA}%)</span>
+                                    <span className="font-bold">{(items.reduce((sum, i) => sum + (i.qty * i.price), 0) * (quoteMetadata.tauxTVA / 100)).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
+                                </div>
+                                <div className="border-t border-gray-200 my-2"></div>
+                                <div className="bg-blue-600 text-white p-4 rounded-xl shadow-lg flex justify-between items-center">
+                                    <span className="text-blue-100 font-bold uppercase tracking-wider text-sm">Total TTC</span>
+                                    <span className="text-2xl font-black">
+                                        {(items.reduce((sum, i) => sum + (i.qty * i.price), 0) * (1 + quoteMetadata.tauxTVA / 100)).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* FOOTER CONDITIONS */}
                     <div className="grid md:grid-cols-2 gap-8 text-xs text-gray-500 border-t pt-6">
@@ -1855,464 +2297,514 @@ const App = () => {
     };
 
     const PlanningView = () => {
-        // State for planifications management
+        // --- STATE ---
+        const [viewMode, setViewMode] = useState('list'); // 'list' | 'editor'
         const [savedPlanifications, setSavedPlanifications] = useState(() => {
             const saved = localStorage.getItem('baticalkul_planifications');
-            return saved ? JSON.parse(saved) : [
-                {
-                    id: 1,
-                    name: 'Exemple: Villa',
-                    description: 'Construction villa R+1',
-                    date: '2026-02-12',
-                    phases: [
-                        { id: 1, name: 'Fondations', duree: 5, color: 'bg-blue-500' },
-                        { id: 2, name: 'Élévation', duree: 10, color: 'bg-orange-500' }
-                    ]
-                }
-            ];
+            return saved ? JSON.parse(saved) : [{
+                id: 1,
+                name: 'Exemple: Villa',
+                description: 'Construction villa R+1',
+                date: new Date().toISOString().split('T')[0],
+                phases: [
+                    { id: 1, name: 'Fondations', duree: 5, color: 'bg-blue-500' },
+                    { id: 2, name: 'Élévation', duree: 10, color: 'bg-orange-500' }
+                ]
+            }];
         });
-        const [activePlanificationId, setActivePlanificationId] = useState(null);
 
-        // Form states
-        const [showCreationForm, setShowCreationForm] = useState(false);
-        const [newPlanificationName, setNewPlanificationName] = useState('');
-        const [newPlanDescription, setNewPlanDescription] = useState('');
-        const [newPlanDate, setNewPlanDate] = useState(new Date().toISOString().split('T')[0]);
+        // Current Editing State
+        const [activePlanId, setActivePlanId] = useState(null);
+        const [currentPlanName, setCurrentPlanName] = useState('');
+        const [currentPlanDesc, setCurrentPlanDesc] = useState('');
+        const [currentPlanDate, setCurrentPlanDate] = useState('');
+        const [currentPhases, setCurrentPhases] = useState([]);
 
-        // State for phases (active planning)
-        const [phases, setPhases] = useState([]);
+        // New Phase State
         const [newPhaseName, setNewPhaseName] = useState('');
         const [newPhaseDuree, setNewPhaseDuree] = useState(5);
         const [newPhaseColor, setNewPhaseColor] = useState('bg-blue-500');
 
-        // Load phases when active planification changes
-        useEffect(() => {
-            if (activePlanificationId) {
-                const plan = savedPlanifications.find(p => p.id === activePlanificationId);
-                if (plan) setPhases(plan.phases || []);
-            }
-        }, [activePlanificationId]);
+        // Color Options
+        const colorOptions = [
+            { bg: 'bg-blue-500', name: 'Bleu' },
+            { bg: 'bg-orange-500', name: 'Orange' },
+            { bg: 'bg-green-500', name: 'Vert' },
+            { bg: 'bg-purple-500', name: 'Violet' },
+            { bg: 'bg-pink-500', name: 'Rose' },
+            { bg: 'bg-cyan-500', name: 'Cyan' },
+            { bg: 'bg-red-500', name: 'Rouge' },
+            { bg: 'bg-yellow-500', name: 'Jaune' },
+        ];
 
-        // Save phases to active planification whenever they change
-        useEffect(() => {
-            if (activePlanificationId) {
-                const updatedPlanifications = savedPlanifications.map(p => {
-                    if (p.id === activePlanificationId) {
-                        return { ...p, phases: phases };
-                    }
-                    return p;
-                });
-                setSavedPlanifications(updatedPlanifications);
-                localStorage.setItem('baticalkul_planifications', JSON.stringify(updatedPlanifications));
-            }
-        }, [phases]);
+        // --- HANDLERS ---
 
-        const handleCreatePlanification = () => {
-            if (!newPlanificationName.trim()) return;
+        const handleSavePlan = () => {
+            if (!currentPlanName.trim()) return;
 
-            const newPlan = {
-                id: Date.now(),
-                name: newPlanificationName,
-                description: newPlanDescription,
-                date: newPlanDate,
-                phases: []
+            const updatedPlan = {
+                id: activePlanId || Date.now(),
+                name: currentPlanName,
+                description: currentPlanDesc,
+                date: currentPlanDate,
+                phases: currentPhases
             };
 
-            const updatedList = [newPlan, ...savedPlanifications];
+            let updatedList;
+            if (activePlanId) {
+                updatedList = savedPlanifications.map(p => p.id === activePlanId ? updatedPlan : p);
+            } else {
+                updatedList = [updatedPlan, ...savedPlanifications];
+            }
+
             setSavedPlanifications(updatedList);
             localStorage.setItem('baticalkul_planifications', JSON.stringify(updatedList));
 
-            // Reset form
-            setNewPlanificationName('');
-            setNewPlanDescription('');
-            setNewPlanDate(new Date().toISOString().split('T')[0]);
-            setShowCreationForm(false);
-            setPhases([]);
+            // Return to list
+            setViewMode('list');
+            setActivePlanId(null);
         };
 
-        const handleDeletePlanification = (id, e) => {
+        const handleLoadPlan = (plan) => {
+            setActivePlanId(plan.id);
+            setCurrentPlanName(plan.name);
+            setCurrentPlanDesc(plan.description);
+            setCurrentPlanDate(plan.date);
+            setCurrentPhases(plan.phases || []);
+            setViewMode('editor');
+        };
+
+        const handleCreateNew = () => {
+            setActivePlanId(null);
+            setCurrentPlanName('');
+            setCurrentPlanDesc('');
+            setCurrentPlanDate(new Date().toISOString().split('T')[0]);
+            setCurrentPhases([]);
+            setViewMode('editor');
+        };
+
+        const handleDeletePlan = (id, e) => {
             e.stopPropagation();
             if (confirm('Supprimer cette planification ?')) {
                 const updatedList = savedPlanifications.filter(p => p.id !== id);
                 setSavedPlanifications(updatedList);
                 localStorage.setItem('baticalkul_planifications', JSON.stringify(updatedList));
-                if (activePlanificationId === id) setActivePlanificationId(null);
             }
         };
 
         const handleAddPhase = () => {
             if (!newPhaseName.trim()) return;
-            const colors = ['bg-blue-500', 'bg-orange-500', 'bg-cyan-500', 'bg-purple-500', 'bg-pink-500', 'bg-green-500'];
-            setPhases([...phases, {
+            setCurrentPhases([...currentPhases, {
                 id: Date.now(),
                 name: newPhaseName,
-                duree: newPhaseDuree,
-                color: colors[phases.length % colors.length]
-            }]);
-            setNewPhaseName('');
-            setNewPhaseDuree(5);
-        };
-
-        const handleDeletePhase = (id) => {
-            setPhases(phases.filter(p => p.id !== id));
-        };
-
-        // If no active planification, show list
-        if (!activePlanificationId) {
-            return (
-                <div className="p-4 space-y-4 pb-32">
-                    <div className="flex justify-between items-center border-b-2 border-indigo-600 pb-2">
-                        <h2 className="text-lg font-black text-gray-800 uppercase tracking-tight flex items-center gap-2">
-                            <Calendar size={20} className="text-indigo-600" /> Planifications
-                        </h2>
-                        {!showCreationForm && (
-                            <button
-                                onClick={() => setShowCreationForm(true)}
-                                className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-[10px] flex items-center gap-1 shadow-md shadow-indigo-200 active:scale-95 transition-transform"
-                            >
-                                <Plus size={14} /> NOUVEAU
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Creation Form */}
-                    {showCreationForm && (
-                        <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 animate-in fade-in slide-in-from-top-4">
-                            <h3 className="font-bold text-indigo-800 mb-3 text-sm">Nouvelle Planification</h3>
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="text-[10px] text-indigo-400 font-bold uppercase block mb-1">Nom du chantier</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Ex: Rénovation Cuisine"
-                                        className="w-full p-2 bg-white border border-indigo-200 rounded-lg text-sm font-medium focus:outline-none focus:border-indigo-500"
-                                        value={newPlanificationName}
-                                        onChange={(e) => setNewPlanificationName(e.target.value)}
-                                        autoFocus
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] text-indigo-400 font-bold uppercase block mb-1">Description (Optionnel)</label>
-                                    <textarea
-                                        placeholder="Détails du chantier..."
-                                        className="w-full p-2 bg-white border border-indigo-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 h-20 resize-none"
-                                        value={newPlanDescription}
-                                        onChange={(e) => setNewPlanDescription(e.target.value)}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] text-indigo-400 font-bold uppercase block mb-1">Date de début</label>
-                                    <input
-                                        type="date"
-                                        className="w-full p-2 bg-white border border-indigo-200 rounded-lg text-sm font-medium focus:outline-none focus:border-indigo-500"
-                                        value={newPlanDate}
-                                        onChange={(e) => setNewPlanDate(e.target.value)}
-                                    />
-                                </div>
-                                <div className="flex justify-end gap-2 mt-2">
-                                    <button
-                                        onClick={() => setShowCreationForm(false)}
-                                        className="px-4 py-2 rounded-lg font-bold text-xs text-indigo-600 hover:bg-indigo-100 transition-colors"
-                                    >
-                                        ANNULER
-                                    </button>
-                                    <button
-                                        onClick={handleCreatePlanification}
-                                        disabled={!newPlanificationName.trim()}
-                                        className={`px-4 py-2 rounded-lg font-bold text-xs transition-colors ${!newPlanificationName.trim() ? 'bg-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'} text-white shadow-lg shadow-indigo-200`}
-                                    >
-                                        CRÉER
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Check if user has no savedPlanifications */}
-                    {savedPlanifications.length === 0 && !showCreationForm ? (
-                        <div className="text-center py-12 flex flex-col items-center gap-3">
-                            <div className="p-4 bg-gray-50 rounded-full text-gray-300">
-                                <Calendar size={32} />
-                            </div>
-                            <p className="text-gray-400 text-sm">Aucune planification.</p>
-                            <button
-                                onClick={() => setShowCreationForm(true)}
-                                className="text-indigo-600 font-bold text-xs hover:underline"
-                            >
-                                Commencer un chantier
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {savedPlanifications.map(p => {
-                                const totalCurrentDuree = (p.phases || []).reduce((sum, ph) => sum + ph.duree, 0);
-                                return (
-                                    <div
-                                        key={p.id}
-                                        onClick={() => {
-                                            console.log("Clicked Planification:", p.id); // DEBUG LOG
-                                            setActivePlanificationId(p.id);
-                                        }}
-                                        className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex justify-between items-center group active:scale-[0.98] transition-all cursor-pointer hover:border-indigo-200 relative z-10" // Added z-10
-                                    >
-                                        <div className="flex items-center gap-3 pointer-events-none">
-                                            <div className="p-2 bg-indigo-50 rounded-lg text-indigo-500 group-hover:bg-indigo-100 transition-colors">
-                                                <Calendar size={20} />
-                                            </div>
-                                            <div>
-                                                <h4 className="font-bold text-gray-800 text-sm">{p.name}</h4>
-                                                <p className="text-[10px] text-gray-500 font-medium">
-                                                    {p.date} • {totalCurrentDuree} jours • {(p.phases || []).length} phases
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={(e) => handleDeletePlanification(p.id, e)}
-                                            className="text-gray-300 hover:text-red-500 p-2 relative z-20" // Ensure delete button is above
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        // Active Planification View
-        const activePlan = savedPlanifications.find(p => p.id === activePlanificationId);
-        const totalDuree = phases.reduce((sum, p) => sum + p.duree, 0);
-
-        // Color options for picker
-        const colorOptions = [
-            { bg: 'bg-blue-500', border: 'border-blue-500' },
-            { bg: 'bg-orange-500', border: 'border-orange-500' },
-            { bg: 'bg-green-500', border: 'border-green-500' },
-            { bg: 'bg-purple-500', border: 'border-purple-500' },
-            { bg: 'bg-pink-500', border: 'border-pink-500' },
-            { bg: 'bg-cyan-500', border: 'border-cyan-500' },
-            { bg: 'bg-yellow-500', border: 'border-yellow-500' },
-            { bg: 'bg-red-500', border: 'border-red-500' },
-        ];
-
-        const handleAddPhaseWithColor = () => {
-            if (!newPhaseName.trim()) return;
-            setPhases([...phases, {
-                id: Date.now(),
-                name: newPhaseName,
-                duree: newPhaseDuree,
+                duree: parseInt(newPhaseDuree) || 1,
                 color: newPhaseColor
             }]);
             setNewPhaseName('');
             setNewPhaseDuree(5);
         };
 
+        const handleDeletePhase = (phaseId) => {
+            setCurrentPhases(currentPhases.filter(p => p.id !== phaseId));
+        };
 
+        // --- VIEWS ---
 
-        if (!activePlan) {
-            // Fallback if active plan is not found but ID is set (should not happen usually)
-            console.warn("Active plan not found for ID:", activePlanificationId);
-            if (activePlanificationId) setActivePlanificationId(null);
-            return null;
+        // 1. DASHBOARD VIEW
+        if (viewMode === 'list') {
+            return (
+                <div className="p-4 space-y-6 pb-32">
+                    <header className="flex justify-between items-center mb-4">
+                        <div className="flex items-center gap-2">
+                            <Calendar size={28} className="text-indigo-600" />
+                            <h2 className="text-xl font-black text-gray-800 uppercase tracking-tight">Mes Plannings</h2>
+                        </div>
+                    </header>
+
+                    {/* CREATE NEW CARD */}
+                    <button
+                        onClick={handleCreateNew}
+                        className="w-full bg-gradient-to-r from-indigo-600 to-indigo-500 text-white p-6 rounded-2xl shadow-lg shadow-indigo-200 flex items-center justify-between group active:scale-[0.98] transition-all"
+                    >
+                        <div className="text-left">
+                            <h3 className="font-bold text-lg">Créer un nouveau planning</h3>
+                            <p className="text-indigo-100 text-xs mt-1">Organisez vos travaux et phases</p>
+                        </div>
+                        <div className="bg-white/20 p-3 rounded-full group-hover:bg-white/30 transition-colors">
+                            <Plus size={24} />
+                        </div>
+                    </button>
+
+                    {/* SAVED LIST */}
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Plannings Enregistrés ({savedPlanifications.length})</h3>
+                        {savedPlanifications.length === 0 ? (
+                            <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                                <p className="text-gray-400 text-sm">Aucun planning sauvegardé.</p>
+                            </div>
+                        ) : (
+                            <div className="grid gap-3">
+                                {savedPlanifications.map(plan => {
+                                    const totalDays = (plan.phases || []).reduce((sum, p) => sum + p.duree, 0);
+                                    return (
+                                        <div key={plan.id} onClick={() => handleLoadPlan(plan)} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex justify-between items-center cursor-pointer hover:border-indigo-300 hover:shadow-md transition-all group">
+                                            <div className="flex items-center gap-4">
+                                                <div className="bg-indigo-50 p-3 rounded-lg text-indigo-600">
+                                                    <Calendar size={20} />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-gray-800">{plan.name}</h4>
+                                                    <p className="text-xs text-gray-500 font-medium">{plan.date} • <span className="text-indigo-600">{totalDays} jours</span></p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <button
+                                                    onClick={(e) => handleDeletePlan(plan.id, e)}
+                                                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                                <ChevronRight size={18} className="text-gray-300 group-hover:text-indigo-500" />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
         }
 
+        // 2. EDITOR VIEW
+        const totalDuration = currentPhases.reduce((acc, p) => acc + p.duree, 0);
+
         return (
-            <div className="p-4 space-y-4 pb-32">
-                <div className="flex items-center gap-2 mb-4 border-b-2 border-indigo-700 pb-2 w-fit">
+            <div className="p-4 bg-gray-50 min-h-screen pb-32 font-sans">
+                {/* Header Actions */}
+                <div className="flex justify-between items-center mb-6 no-print">
                     <button
-                        onClick={() => setActivePlanificationId(null)}
-                        className="mr-2 text-indigo-800"
+                        onClick={() => setViewMode('list')}
+                        className="text-gray-500 hover:text-indigo-600 flex items-center gap-1 font-bold text-xs uppercase"
                     >
-                        <ChevronLeft size={24} />
+                        <ChevronLeft size={16} /> Retour
                     </button>
-                    <Calendar size={20} className="text-indigo-800" />
-                    <h2 className="text-lg font-black text-indigo-950 uppercase tracking-tight">
-                        {activePlan.name}
-                    </h2>
-                </div>
-
-                {/* Duration Card - Matches the blue card in mockup */}
-                <div className="bg-indigo-50 p-6 rounded-2xl shadow-sm border border-indigo-100">
-                    <h3 className="font-bold text-indigo-900 text-sm mb-2">Durée Totale</h3>
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-5xl font-black text-indigo-700">{totalDuree}</span>
-                        <span className="text-lg font-bold text-indigo-700">jours</span>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleSavePlan}
+                            disabled={!currentPlanName.trim()}
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 hover:bg-green-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        >
+                            <Save size={16} /> SAUVEGARDER
+                        </button>
                     </div>
-                    <p className="text-xs text-indigo-400 mt-1 pl-1">~ {Math.ceil(totalDuree / 7)} semaines</p>
                 </div>
 
-                {/* Add Phase Card */}
-                <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-                    <h3 className="font-bold text-gray-800 mb-4 text-sm">Ajouter une phase</h3>
-                    <div className="space-y-3">
-                        <input
-                            type="text"
-                            placeholder="Nom de la phase..."
-                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium focus:outline-none focus:border-indigo-500 transition-colors"
-                            value={newPhaseName}
-                            onChange={(e) => setNewPhaseName(e.target.value)}
-                        />
+                {/* MAIN EDITOR CONTENT */}
+                <div className="max-w-4xl mx-auto space-y-6">
 
-                        {/* Color Picker */}
-                        <div className="flex gap-2 mb-2 overflow-x-auto pb-2">
-                            {colorOptions.map((c) => (
-                                <button
-                                    key={c.bg}
-                                    onClick={() => setNewPhaseColor(c.bg)}
-                                    className={`w-6 h-6 rounded-full ${c.bg} ${newPhaseColor === c.bg ? 'ring-2 ring-offset-2 ring-gray-400 scale-110' : ''} transition-all`}
+                    {/* 1. PROJECT INFO CARD */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                        <div className="flex items-center gap-2 mb-4 border-b pb-2 border-gray-100">
+                            <Info size={18} className="text-indigo-600" />
+                            <h3 className="font-bold text-gray-800 text-sm uppercase">Informations du Chantier</h3>
+                        </div>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Nom du planning</label>
+                                <input
+                                    value={currentPlanName}
+                                    onChange={e => setCurrentPlanName(e.target.value)}
+                                    placeholder="Ex: Construction Villa Mme. Dupont"
+                                    className="w-full text-lg font-bold border-b-2 border-gray-200 focus:border-indigo-600 outline-none py-1 transition-colors bg-transparent placeholder-gray-300"
+                                    autoFocus
                                 />
-                            ))}
-                        </div>
-
-                        <div className="flex gap-3">
-                            <input
-                                type="number"
-                                min="1"
-                                placeholder="Jours"
-                                className="w-20 p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-center"
-                                value={newPhaseDuree}
-                                onChange={(e) => setNewPhaseDuree(parseInt(e.target.value) || 1)}
-                            />
-                            <button
-                                onClick={handleAddPhaseWithColor}
-                                disabled={!newPhaseName.trim()}
-                                className="flex-1 bg-indigo-600 text-white rounded-lg font-bold text-sm shadow-md shadow-indigo-200 active:scale-95 transition-transform hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed uppercase tracking-wider">
-                                AJOUTER
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Phases List */}
-                <div className="space-y-4">
-                    <h3 className="font-bold text-gray-800 text-sm pl-1">Phases de travaux</h3>
-                    {phases.map((phase, index) => {
-                        const startDay = phases.slice(0, index).reduce((acc, p) => acc + p.duree, 0) + 1;
-                        const endDay = startDay + phase.duree - 1;
-                        const widthPercent = (phase.duree / totalDuree) * 100;
-
-                        return (
-                            <div key={phase.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative group">
-                                <div className="flex justify-between items-start mb-3">
-                                    <div>
-                                        <h4 className="font-bold text-gray-900 text-sm mb-0.5">{phase.name}</h4>
-                                        <p className="text-xs text-gray-400">Jours {startDay} - {endDay} ({phase.duree} jours)</p>
-                                    </div>
-                                    <button
-                                        onClick={() => handleDeletePhase(phase.id)}
-                                        className="text-gray-300 hover:text-red-400 bg-gray-50 hover:bg-red-50 p-2 rounded-lg transition-colors"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Date de début</label>
+                                    <input
+                                        type="date"
+                                        value={currentPlanDate}
+                                        onChange={e => setCurrentPlanDate(e.target.value)}
+                                        className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                                    />
                                 </div>
-
-                                <div className="relative pt-1">
-                                    <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 mb-1">
-                                        <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                                            <div
-                                                className={`h-full ${phase.color} rounded-full`}
-                                                style={{ width: `${Math.max(widthPercent, 5)}%` }}
-                                            ></div>
-                                        </div>
-                                    </div>
-                                    <span className="absolute top-1 left-2 text-[9px] font-bold text-white drop-shadow-md">
-                                        {Math.round(widthPercent)}%
-                                    </span>
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Description</label>
+                                    <input
+                                        value={currentPlanDesc}
+                                        onChange={e => setCurrentPlanDesc(e.target.value)}
+                                        placeholder="Description optionnelle..."
+                                        className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                                    />
                                 </div>
                             </div>
-                        );
-                    })}
+                        </div>
+                    </div>
+
+                    {/* 2. VISUAL TIMELINE (GANTT) */}
+                    {currentPhases.length > 0 && (
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="font-bold text-gray-800 text-sm uppercase flex items-center gap-2">
+                                    <Sliders size={18} className="text-indigo-600" /> Chronologie
+                                </h3>
+                                <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold">
+                                    Total: {totalDuration} Jours
+                                </span>
+                            </div>
+
+                            {/* Gantt Bars */}
+                            <div className="flex h-12 rounded-full overflow-hidden bg-gray-100 w-full mb-6 relative">
+                                {currentPhases.map((phase, idx) => {
+                                    const widthPercent = (phase.duree / totalDuration) * 100;
+                                    return (
+                                        <div
+                                            key={phase.id}
+                                            style={{ width: `${widthPercent}%` }}
+                                            className={`${phase.color} h-full border-r border-white/20 relative group transition-all hover:brightness-110`}
+                                            title={`${phase.name}: ${phase.duree}j`}
+                                        >
+                                            {widthPercent > 10 && (
+                                                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white/90 truncate px-1">
+                                                    {phase.name}
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Phase List Cards */}
+                            <div className="space-y-2">
+                                {currentPhases.map((phase, index) => (
+                                    <div key={phase.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-100 group hover:border-indigo-200 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-3 h-3 rounded-full ${phase.color}`}></div>
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-xs text-gray-700">{index + 1}. {phase.name}</span>
+                                                <span className="text-[10px] text-gray-400">{phase.duree} jours</span>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => handleDeletePhase(phase.id)} className="text-gray-300 hover:text-red-500">
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 3. ADD PHASE FORM */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-8">
+                        <h3 className="font-bold text-gray-800 text-sm uppercase mb-4 flex items-center gap-2">
+                            <Plus size={18} className="text-indigo-600" /> Ajouter une Phase
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                            <div className="md:col-span-2">
+                                <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Nom de la phase</label>
+                                <input
+                                    value={newPhaseName}
+                                    onChange={e => setNewPhaseName(e.target.value)}
+                                    placeholder="Ex: Fondations, Murs..."
+                                    className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddPhase()}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Durée (Jours)</label>
+                                <input
+                                    type="number"
+                                    value={newPhaseDuree}
+                                    onChange={e => setNewPhaseDuree(e.target.value)}
+                                    className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddPhase()}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Couleur</label>
+                                <div className="flex gap-1">
+                                    {colorOptions.slice(0, 4).map(c => (
+                                        <button
+                                            key={c.bg}
+                                            onClick={() => setNewPhaseColor(c.bg)}
+                                            className={`w-6 h-6 rounded-full ${c.bg} ${newPhaseColor === c.bg ? 'ring-2 ring-offset-1 ring-gray-400' : ''}`}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleAddPhase}
+                            disabled={!newPhaseName.trim()}
+                            className="mt-4 w-full bg-indigo-600 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            AJOUTER LA PHASE
+                        </button>
+                    </div>
+
                 </div>
             </div>
         );
-    };
 
 
 
 
-    const AddEscalier = ({ onAdd }) => {
-        const [temp, setTemp] = useState({ volume: 1, dosage: 350 });
+
+
+        const AddEscalier = ({ onAdd }) => {
+            const [temp, setTemp] = useState({ volume: 1, dosage: 350 });
+            return (
+                <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
+                    <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
+                        <TrendingUp size={16} className="text-gray-600" /> Escalier (Volume)
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Volume (m³)</label>
+                            <input type="number" placeholder="m³" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.volume} onChange={e => setTemp({ ...temp, volume: parseFloat(e.target.value) || 0 })} />
+                        </div>
+                        <div>
+                            <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Dosage Ciment</label>
+                            <input type="number" placeholder="kg/m³" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.dosage} onChange={e => setTemp({ ...temp, dosage: parseInt(e.target.value) || 350 })} />
+                        </div>
+                    </div>
+                    <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-gray-800 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER ESCALIER</button>
+                </div>
+            );
+        };
+
+        const AddDivers = ({ onAdd }) => {
+            const [temp, setTemp] = useState({ quantity: 1, longueur: 1, largeur: 1, epaisseur: 0.1, dosage: 350, isReinforced: false, steelRatio: 80 });
+            return (
+                <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
+                    <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
+                        <Layers size={16} className="text-pink-600" /> Divers / Autre Béton
+                    </h3>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                        <div>
+                            <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Quantité</label>
+                            <input type="number" placeholder="1" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.quantity} onChange={e => setTemp({ ...temp, quantity: parseInt(e.target.value) || 1 })} />
+                        </div>
+                        <div>
+                            <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Dosage (kg/m³)</label>
+                            <input type="number" placeholder="350" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.dosage} onChange={e => setTemp({ ...temp, dosage: parseInt(e.target.value) || 350 })} />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                        <div>
+                            <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">L (m)</label>
+                            <input type="number" placeholder="L" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.longueur} onChange={e => setTemp({ ...temp, longueur: parseFloat(e.target.value) || 0 })} />
+                        </div>
+                        <div>
+                            <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">l (m)</label>
+                            <input type="number" placeholder="l" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.largeur} onChange={e => setTemp({ ...temp, largeur: parseFloat(e.target.value) || 0 })} />
+                        </div>
+                        <div>
+                            <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Ep (m)</label>
+                            <input type="number" placeholder="Ep" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.epaisseur} onChange={e => setTemp({ ...temp, epaisseur: parseFloat(e.target.value) || 0 })} />
+                        </div>
+                    </div>
+
+                    <div className="bg-gray-50 p-2 rounded mb-3">
+                        <div className="flex items-center gap-2">
+                            <input type="checkbox" className="w-4 h-4" checked={temp.isReinforced} onChange={e => setTemp(prev => ({ ...prev, isReinforced: e.target.checked }))} />
+                            <span className="text-[10px] uppercase font-bold text-gray-600">Armé ?</span>
+                        </div>
+                        {temp.isReinforced && (
+                            <div className="mt-2 animate-in fade-in slide-in-from-top-1">
+                                <label className="text-[8px] text-gray-400 font-bold uppercase block">Ratio Acier (kg/m³)</label>
+                                <input type="number" placeholder="80" className="w-full p-2 bg-white border rounded text-xs" value={temp.steelRatio} onChange={e => setTemp({ ...temp, steelRatio: parseFloat(e.target.value) || 0 })} />
+                            </div>
+                        )}
+                    </div>
+
+                    <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-pink-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER ÉLÉMENT</button>
+                </div>
+            );
+        };
+
+        // --- PlanningView Main Render ---
         return (
-            <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
-                <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
-                    <TrendingUp size={16} className="text-gray-600" /> Escalier (Volume)
-                </h3>
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Volume (m³)</label>
-                        <input type="number" placeholder="m³" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.volume} onChange={e => setTemp({ ...temp, volume: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Dosage Ciment</label>
-                        <input type="number" placeholder="kg/m³" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.dosage} onChange={e => setTemp({ ...temp, dosage: parseInt(e.target.value) || 350 })} />
-                    </div>
-                </div>
-                <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-gray-800 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER ESCALIER</button>
-            </div>
-        );
-    };
+            <div className="p-4 space-y-4 pb-32">
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <h2 className="text-xl font-black text-gray-800 uppercase tracking-tight mb-4">Planning Chantier</h2>
+                    {viewMode === 'list' ? (
+                        <div className="space-y-4">
+                            <button onClick={() => { setActivePlanId(null); setViewMode('editor'); }} className="w-full bg-blue-600 text-white p-4 rounded-xl shadow-lg shadow-blue-200 flex items-center justify-between group active:scale-95 transition-all">
+                                <span className="font-bold">Créer un nouveau planning</span>
+                                <Plus className="bg-white/20 p-1 rounded-full w-8 h-8" />
+                            </button>
 
-    const AddDivers = ({ onAdd }) => {
-        const [temp, setTemp] = useState({ quantity: 1, longueur: 1, largeur: 1, epaisseur: 0.1, dosage: 350, isReinforced: false, steelRatio: 80 });
-        return (
-            <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
-                <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
-                    <Layers size={16} className="text-pink-600" /> Divers / Autre Béton
-                </h3>
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Quantité</label>
-                        <input type="number" placeholder="1" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.quantity} onChange={e => setTemp({ ...temp, quantity: parseInt(e.target.value) || 1 })} />
-                    </div>
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Dosage (kg/m³)</label>
-                        <input type="number" placeholder="350" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.dosage} onChange={e => setTemp({ ...temp, dosage: parseInt(e.target.value) || 350 })} />
-                    </div>
-                </div>
-                <div className="grid grid-cols-3 gap-2 mb-3">
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">L (m)</label>
-                        <input type="number" placeholder="L" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.longueur} onChange={e => setTemp({ ...temp, longueur: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">l (m)</label>
-                        <input type="number" placeholder="l" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.largeur} onChange={e => setTemp({ ...temp, largeur: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Ep (m)</label>
-                        <input type="number" placeholder="Ep" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.epaisseur} onChange={e => setTemp({ ...temp, epaisseur: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                </div>
+                            {savedPlanifications.length === 0 ? (
+                                <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-gray-400 text-sm">Aucun planning</div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {savedPlanifications.map(p => (
+                                        <div key={p.id} onClick={() => handleLoadPlan(p)} className="bg-white p-4 rounded-xl border flex justify-between items-center cursor-pointer hover:shadow-md transition-all">
+                                            <div>
+                                                <h3 className="font-bold text-gray-800">{p.name}</h3>
+                                                <p className="text-xs text-gray-500">{p.phases?.length || 0} phases</p>
+                                            </div>
+                                            <button onClick={(e) => { e.stopPropagation(); handleDeletePlan(p.id); }} className="p-2 text-gray-300 hover:text-red-500"><Trash2 size={16} /></button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center border-b pb-2">
+                                <button onClick={() => setViewMode('list')} className="text-gray-500"><ChevronLeft /></button>
+                                <span className="font-bold uppercase">Éditeur</span>
+                                <button onClick={handleSavePlan} className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold flex items-center gap-1"><Save size={14} /> SAUVEGARDER</button>
+                            </div>
 
-                <div className="bg-gray-50 p-2 rounded mb-3">
-                    <div className="flex items-center gap-2">
-                        <input type="checkbox" className="w-4 h-4" checked={temp.isReinforced} onChange={e => setTemp(prev => ({ ...prev, isReinforced: e.target.checked }))} />
-                        <span className="text-[10px] uppercase font-bold text-gray-600">Armé ?</span>
-                    </div>
-                    {temp.isReinforced && (
-                        <div className="mt-2 animate-in fade-in slide-in-from-top-1">
-                            <label className="text-[8px] text-gray-400 font-bold uppercase block">Ratio Acier (kg/m³)</label>
-                            <input type="number" placeholder="80" className="w-full p-2 bg-white border rounded text-xs" value={temp.steelRatio} onChange={e => setTemp({ ...temp, steelRatio: parseFloat(e.target.value) || 0 })} />
+                            <input type="text" placeholder="Nom du planning" className="w-full p-2 border rounded font-bold" value={currentPlanName} onChange={e => setCurrentPlanName(e.target.value)} />
+
+                            <div className="space-y-3">
+                                <div className="bg-gray-50 p-3 rounded-lg border">
+                                    <h4 className="font-bold text-xs uppercase text-gray-500 mb-2">Ajouter une phase</h4>
+                                    <div className="grid grid-cols-2 gap-2 mb-2">
+                                        <input type="text" placeholder="Nom phase" className="p-2 border rounded text-xs" value={newPhaseName} onChange={e => setNewPhaseName(e.target.value)} />
+                                        <input type="number" placeholder="Durée (jours)" className="p-2 border rounded text-xs" value={newPhaseDuree} onChange={e => setNewPhaseDuree(parseInt(e.target.value) || 1)} />
+                                    </div>
+                                    <div className="flex gap-1 mb-2 overflow-x-auto pb-1">
+                                        {colorOptions.map(c => (
+                                            <button key={c.name} onClick={() => setNewPhaseColor(c.bg)} className={`w-6 h-6 rounded-full ${c.bg} ${newPhaseColor === c.bg ? 'ring-2 ring-offset-1 ring-gray-400' : ''}`} />
+                                        ))}
+                                    </div>
+                                    <button onClick={handleAddPhase} className="w-full bg-green-600 text-white py-2 rounded font-bold text-xs">AJOUTER PHASE</button>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {currentPhases.map(phase => (
+                                        <div key={phase.id} className="bg-white p-3 rounded border flex justify-between items-center shadow-sm">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-3 h-10 rounded-full ${phase.color}`} />
+                                                <div>
+                                                    <p className="font-bold text-sm">{phase.name}</p>
+                                                    <p className="text-xs text-gray-500">{phase.duree} jours</p>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => handleDeletePhase(phase.id)} className="text-red-300 hover:text-red-500"><Trash2 size={14} /></button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
-
-                <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-pink-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER ÉLÉMENT</button>
             </div>
         );
     };
 
+
+
     const Dashboard = () => (
-        <div className="p-4 space-y-6">
-            <header className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-black text-gray-900 tracking-tight italic">BatiCalcul</h1>
-                    <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider">Expertise Gros Œuvre</p>
-                </div>
-                <div className="p-2 bg-blue-100 text-blue-700 rounded-full"><HardHat size={20} /></div>
-            </header>
+        <div className="p-4 space-y-6 pt-20">
+
 
             <div className="grid grid-cols-2 gap-3">
                 <StatCard title="Ciment" value={totals.ciment} unit="Sacs 50kg" color="bg-blue-600" />
@@ -2546,15 +3038,80 @@ const App = () => {
         );
     };
 
+
+
+    // Main component render  
     return (
-        <div className="w-full min-h-screen bg-slate-50 font-sans pb-28 relative">
+        <div className="w-full min-h-screen bg-slate-50 font-sans pb-28 relative pt-14">
+            <TopNavbar
+                onConnect={() => setShowAuthModal(true)}
+                currentUser={currentUser}
+                onProfileClick={() => setShowProfileMenu(!showProfileMenu)}
+            />
+
+            {/* Profile Dropdown Menu */}
+            {showProfileMenu && currentUser && (
+                <div className="fixed top-16 right-4 bg-white rounded-xl shadow-2xl border border-gray-100 w-64 overflow-hidden animate-in slide-in-from-top-2 fade-in duration-200 z-[9999]">
+                    <div className="p-4 bg-gradient-to-r from-pink-600 to-purple-600 text-white">
+                        <p className="text-xs font-bold opacity-80 uppercase">Connecté en tant que</p>
+                        <p className="text-lg font-black">{currentUser.name}</p>
+                    </div>
+                    <div className="p-2">
+                        <button
+                            onClick={() => {
+                                setShowProfileMenu(false);
+                                setActiveTab('dashboard');
+                            }}
+                            className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors text-left"
+                        >
+                            <Layout size={18} className="text-gray-600" />
+                            <span className="text-sm font-bold text-gray-700">Tableau de bord</span>
+                        </button>
+                        <button
+                            onClick={() => {
+                                setShowProfileMenu(false);
+                                setPlusViewMode('settings');
+                                setActiveTab('plus');
+                            }}
+                            className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors text-left"
+                        >
+                            <Settings2 size={18} className="text-gray-600" />
+                            <span className="text-sm font-bold text-gray-700">Paramètres</span>
+                        </button>
+                        <button
+                            onClick={() => {
+                                setShowProfileMenu(false);
+                                setPlusViewMode('profile');
+                                setActiveTab('plus');
+                            }}
+                            className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors text-left"
+                        >
+                            <User size={18} className="text-gray-600" />
+                            <span className="text-sm font-bold text-gray-700">Mon Profil</span>
+                        </button>
+                        <div className="border-t border-gray-100 my-2"></div>
+                        <button
+                            onClick={async () => {
+                                await supabase.auth.signOut();
+                                setCurrentUser(null);
+                                setShowProfileMenu(false);
+                            }}
+                            className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-red-50 transition-colors text-left"
+                        >
+                            <X size={18} className="text-red-600" />
+                            <span className="text-sm font-bold text-red-600">Se déconnecter</span>
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {activeTab === 'dashboard' && <Dashboard />}
-            {activeTab === 'calc' && <CalcView />}
-            {activeTab === 'projects' && <ProjectsView />}
-            {activeTab === 'devis' && <DevisDQE />}
-            {activeTab === 'planning' && <PlanningView />}
-            {activeTab === 'forum' && <ForumView />}
-            {activeTab === 'plus' && <PlusView />}
+            {activeTab === 'calc' && <div className="pt-2"><CalcView /></div>}
+            {activeTab === 'projects' && <div className="pt-2"><ProjectsView /></div>}
+            {activeTab === 'devis' && <div className="pt-2"><DevisDQE /></div>}
+            {activeTab === 'planning' && <div className="pt-2"><PlanningView /></div>}
+            {activeTab === 'forum' && <div className="pt-2"><ForumView /></div>}
+            {activeTab === 'plus' && <div className="pt-2"><PlusView /></div>}
 
             {/* Floating Forum Button */}
             <button
@@ -2575,35 +3132,12 @@ const App = () => {
                 <NavItem active={activeTab === 'planning'} icon={<Calendar size={18} />} label="Planning" onClick={() => setActiveTab('planning')} />
                 <NavItem active={activeTab === 'plus'} icon={<Settings2 size={18} />} label="Plus" onClick={() => setActiveTab('plus')} />
             </nav>
+
+            {showAuthModal && <AuthModal />}
         </div>
     );
 };
 
-const StatCard = ({ title, value, unit, extra, color }) => (
-    <div className={`${color} p-4 rounded-2xl text-white shadow-md relative overflow-hidden transition-all hover:scale-[1.02]`}>
-        <p className="text-[9px] opacity-70 uppercase font-black mb-1 tracking-widest">{title}</p>
-        <div className="flex items-baseline gap-1">
-            <span className="text-xl font-black">{value}</span>
-            <span className="text-[9px] font-bold opacity-80">{unit}{extra}</span>
-        </div>
-    </div>
-);
 
-const NavItem = ({ active, icon, label, onClick }) => (
-    <button onClick={onClick} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-300 ${active ? 'text-blue-600 bg-blue-50 scale-105' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}>
-        {icon}
-        <span className={`text-[9px] font-black uppercase tracking-tighter transition-all ${active ? 'opacity-100' : 'opacity-70'}`}>{label}</span>
-    </button>
-);
-
-const ListItem = ({ title, details, color, onRemove }) => (
-    <div className={`flex justify-between items-center bg-white p-3 rounded-xl border border-gray-100 shadow-sm border-l-4 ${color} transition-all hover:shadow-md`}>
-        <div className="flex flex-col">
-            <span className="font-bold text-gray-800 text-[11px] uppercase tracking-wide">{title}</span>
-            <span className="text-[9px] text-gray-500 font-medium">{details}</span>
-        </div>
-        <button onClick={onRemove} className="p-2 text-red-300 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
-    </div>
-);
 
 export default App;
