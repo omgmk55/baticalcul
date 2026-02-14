@@ -1642,6 +1642,8 @@ const App = () => {
         }
 
         // --- LIST VIEW (DEFAULT) ---
+        const filteredTopics = filterCategory === 'All' ? topics : topics.filter(t => t.category === filterCategory);
+
         return (
             <div className="p-4 pb-32 space-y-6">
                 {/* Header */}
