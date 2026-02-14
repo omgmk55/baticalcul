@@ -137,6 +137,110 @@ const ListItem = ({ title, details, color, onRemove }) => (
     </div>
 );
 
+const AdminView = () => {
+    const [users, setUsers] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchUsers();
+    }, []);
+
+    const fetchUsers = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setUsers(data || []);
+        } catch (error) {
+            console.error('Error fetching users:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="space-y-8 animate-in fade-in duration-500">
+            <header>
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="bg-purple-100 p-3 rounded-2xl">
+                        <Shield size={32} className="text-purple-600" />
+                    </div>
+                    <div>
+                        <h1 className="text-3xl font-black text-gray-900 tracking-tight">Administration</h1>
+                        <p className="text-gray-500 font-medium">Gestion des utilisateurs et statistiques</p>
+                    </div>
+                </div>
+            </header>
+
+            <div className="grid md:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-gray-500 text-sm uppercase tracking-wider">Utilisateurs Total</h3>
+                        <Users size={20} className="text-blue-500" />
+                    </div>
+                    <p className="text-4xl font-black text-gray-900">{users.length}</p>
+                    <p className="text-xs text-green-600 font-bold mt-2 flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                        Inscrits sur la plateforme
+                    </p>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-6 border-b border-gray-50 flex justify-between items-center">
+                    <h3 className="font-bold text-lg text-gray-900">Utilisateurs Inscrits</h3>
+                    <button onClick={fetchUsers} className="text-blue-600 hover:text-blue-700 font-bold text-sm">
+                        Actualiser
+                    </button>
+                </div>
+
+                {loading ? (
+                    <div className="p-12 text-center text-gray-400">Chargement...</div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider font-bold text-xs">
+                                <tr>
+                                    <th className="p-4">Email</th>
+                                    <th className="p-4">Nom</th>
+                                    <th className="p-4">Date d'inscription</th>
+                                    <th className="p-4 text-right">ID</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {users.map((user) => (
+                                    <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                                        <td className="p-4 font-bold text-gray-900">{user.email || 'Email non disponible'}</td>
+                                        <td className="p-4 text-gray-600 font-medium">{user.username || '-'}</td>
+                                        <td className="p-4 text-gray-500">
+                                            {new Date(user.updated_at || Date.now()).toLocaleDateString('fr-FR', {
+                                                year: 'numeric',
+                                                month: 'long',
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            })}
+                                        </td>
+                                        <td className="p-4 text-right text-xs text-gray-400 font-mono">{user.id.slice(0, 8)}...</td>
+                                    </tr>
+                                ))}
+                                {users.length === 0 && (
+                                    <tr>
+                                        <td colSpan="4" className="p-8 text-center text-gray-500">Aucun utilisateur trouvé</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 const App = () => {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [project, setProject] = useState({
@@ -1800,6 +1904,110 @@ const App = () => {
         </div>
     );
 
+    const AdminView = () => {
+        const [users, setUsers] = useState([]);
+        const [loading, setLoading] = useState(true);
+
+        useEffect(() => {
+            fetchUsers();
+        }, []);
+
+        const fetchUsers = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+                setUsers(data || []);
+            } catch (error) {
+                console.error('Error fetching users:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        return (
+            <div className="space-y-8">
+                <header>
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="bg-purple-100 p-3 rounded-2xl">
+                            <Shield size={32} className="text-purple-600" />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-black text-gray-900 tracking-tight">Administration</h1>
+                            <p className="text-gray-500 font-medium">Gestion des utilisateurs et statistiques</p>
+                        </div>
+                    </div>
+                </header>
+
+                <div className="grid md:grid-cols-3 gap-6">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-gray-500 text-sm uppercase tracking-wider">Utilisateurs Total</h3>
+                            <Users size={20} className="text-blue-500" />
+                        </div>
+                        <p className="text-4xl font-black text-gray-900">{users.length}</p>
+                        <p className="text-xs text-green-600 font-bold mt-2 flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                            Inscrits sur la plateforme
+                        </p>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="p-6 border-b border-gray-50 flex justify-between items-center">
+                        <h3 className="font-bold text-lg text-gray-900">Utilisateurs Inscrits</h3>
+                        <button onClick={fetchUsers} className="text-blue-600 hover:text-blue-700 font-bold text-sm">
+                            Actualiser
+                        </button>
+                    </div>
+
+                    {loading ? (
+                        <div className="p-12 text-center text-gray-400">Chargement...</div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider font-bold text-xs">
+                                    <tr>
+                                        <th className="p-4">Email</th>
+                                        <th className="p-4">Nom</th>
+                                        <th className="p-4">Date d'inscription</th>
+                                        <th className="p-4 text-right">ID</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {users.map((user) => (
+                                        <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="p-4 font-bold text-gray-900">{user.email || 'Email non disponible'}</td>
+                                            <td className="p-4 text-gray-600 font-medium">{user.username || '-'}</td>
+                                            <td className="p-4 text-gray-500">
+                                                {new Date(user.updated_at || Date.now()).toLocaleDateString('fr-FR', {
+                                                    year: 'numeric',
+                                                    month: 'long',
+                                                    day: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                })}
+                                            </td>
+                                            <td className="p-4 text-right text-xs text-gray-400 font-mono">{user.id.slice(0, 8)}...</td>
+                                        </tr>
+                                    ))}
+                                    {users.length === 0 && (
+                                        <tr>
+                                            <td colSpan="4" className="p-8 text-center text-gray-500">Aucun utilisateur trouvé</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     const DevisDQE = () => {
         // --- DATA & STATE ---
         const [viewMode, setViewMode] = useState('list'); // 'list' | 'editor'
@@ -3089,6 +3297,16 @@ const App = () => {
                         <button
                             onClick={() => {
                                 setShowProfileMenu(false);
+                                setActiveTab('admin');
+                            }}
+                            className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-purple-50 transition-colors text-left"
+                        >
+                            <Shield size={18} className="text-purple-600" />
+                            <span className="text-sm font-bold text-gray-700">Administration</span>
+                        </button>
+                        <button
+                            onClick={() => {
+                                setShowProfileMenu(false);
                                 setPlusViewMode('profile');
                                 setActiveTab('plus');
                             }}
@@ -3118,6 +3336,7 @@ const App = () => {
             {activeTab === 'projects' && <div className="pt-2"><ProjectsView /></div>}
             {activeTab === 'devis' && <div className="pt-2"><DevisDQE /></div>}
             {activeTab === 'planning' && <div className="pt-2"><PlanningView /></div>}
+            {activeTab === 'admin' && <div className="pt-2"><AdminView /></div>}
             {activeTab === 'forum' && <div className="pt-2"><ForumView /></div>}
             {activeTab === 'plus' && <div className="pt-2"><PlusView /></div>}
 
