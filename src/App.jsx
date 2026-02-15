@@ -34,7 +34,8 @@ import {
     LogOut,
     Shield,
     Monitor,
-    Smartphone
+    Smartphone,
+    Send
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
@@ -1664,7 +1665,9 @@ const App = () => {
                                     if (e.key === 'Enter') handlePostMessage();
                                 }}
                             />
-                            <button onClick={handlePostMessage} className="bg-pink-600 text-white p-2 rounded-lg shadow-md active:scale-95 transition-transform"><Share2 size={16} /></button>
+                            <button onClick={handlePostMessage} className="bg-pink-600 text-white p-2 rounded-lg shadow-md active:scale-95 transition-transform">
+                                <Send size={16} />
+                            </button>
                         </div>
                     </div>
                 </div>
