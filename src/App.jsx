@@ -524,7 +524,7 @@ const App = () => {
             floors: projectFloors,
             rooms: projectRooms,
             date: projectDateTime || new Date().toLocaleString('fr-FR'),
-            totalMat: `${totals.ciment} Sacs`,
+            totalMat: `${(totals.global?.ciment || totals.ciment)} Sacs`,
             activeForms: activeConstructionForms,
             projectData: { ...project },
             totals: { ...totals }
@@ -644,6 +644,24 @@ const App = () => {
 
     // --- LOGIQUE DE CALCUL GLOBAL ---
     const calculateProjectTotals = (proj) => {
+        const results = {
+            global: {
+                ciment: 0, sable: 0, gravier: 0, briques: 0, acier: 0,
+                coffrage: 0, toles: 0, chevrons: 0, surfaceCarrelage: 0, nbCarreaux: 0
+            },
+            categories: {
+                semelles: { ciment: 0, sable: 0, gravier: 0, acier: {} },
+                poutres: { ciment: 0, sable: 0, gravier: 0, acier: {}, coffrage: 0 },
+                poteaux: { ciment: 0, sable: 0, gravier: 0, acier: {}, coffrage: 0 },
+                murs: { briques: 0, ciment: 0, sable: 0 },
+                dalles: { ciment: 0, sable: 0, gravier: 0, acier: {}, coffrage: 0, chevrons: 0 },
+                divers: { ciment: 0, sable: 0, gravier: 0, acier: {} },
+                escaliers: { ciment: 0, sable: 0, gravier: 0, acier: {} },
+                toiture: { toles: 0 },
+                carrelage: { surface: 0, carreaux: 0 }
+            }
+        };
+
         let volBetonTotal = 0;
         let volMortierTotal = 0;
         let nbBriquesTotal = 0;
@@ -652,35 +670,59 @@ const App = () => {
         let nbChevronsTotal = 0;
         let surfaceCarrelageTotal = 0;
         let nbCarreauxTotal = 0;
-
         let kgCimentTotal = 0;
         let surfaceCoffrageTotal = 0;
+
+        const addSteel = (cat, diam, kg) => {
+            const d = parseInt(diam) || 8;
+            results.categories[cat].acier[d] = (results.categories[cat].acier[d] || 0) + kg;
+        };
 
         // Calcul Semelles
         proj.semelles.forEach(s => {
             const v = s.longueur * s.largeur * s.epaisseur;
             volBetonTotal += v;
-            kgCimentTotal += v * RATIOS.CIMENT_BETON;
+            const ciment = v * RATIOS.CIMENT_BETON;
+            const sable = v * RATIOS.SABLE_BETON;
+            const gravier = v * RATIOS.GRAVIER_BETON;
+            kgCimentTotal += ciment;
+
+            results.categories.semelles.ciment += ciment;
+            results.categories.semelles.sable += sable;
+            results.categories.semelles.gravier += gravier;
+
             const nbBarres = 12;
             const longBarre = (s.longueur + s.largeur);
-            kgAcierTotal += nbBarres * longBarre * (STEEL_WEIGHTS[s.diametre] || 0.888);
+            const kgAcier = nbBarres * longBarre * (STEEL_WEIGHTS[s.diametre] || 0.888);
+            kgAcierTotal += kgAcier;
+            addSteel('semelles', s.diametre, kgAcier);
         });
 
         // Calcul Poutres/Chaînages
         proj.poutres.forEach(p => {
             const v = p.longueur * p.sectionL * p.sectionH;
             volBetonTotal += v;
-            kgCimentTotal += v * RATIOS.CIMENT_BETON;
+            const ciment = v * RATIOS.CIMENT_BETON;
+            const sable = v * RATIOS.SABLE_BETON;
+            const gravier = v * RATIOS.GRAVIER_BETON;
+            kgCimentTotal += ciment;
+
+            results.categories.poutres.ciment += ciment;
+            results.categories.poutres.sable += sable;
+            results.categories.poutres.gravier += gravier;
+
             const kgLong = 4 * p.longueur * (STEEL_WEIGHTS[p.diametre] || 0.888);
             const espacement = p.espacementCadre || 0.20;
             const nbCadres = Math.ceil(p.longueur / espacement) + 1;
             const perimetreCadre = (p.sectionL + p.sectionH) * 2;
             const kgCadres = nbCadres * perimetreCadre * (STEEL_WEIGHTS[p.diametreCadre] || 0.222);
             kgAcierTotal += (kgLong + kgCadres);
+            addSteel('poutres', p.diametre, kgLong);
+            addSteel('poutres', p.diametreCadre, kgCadres);
 
-            // Calcul Coffrage (Fond + 2 Joues)
-            const surfacePoutre = (p.sectionL + (2 * p.sectionH)) * p.longueur;
-            surfaceCoffrageTotal += surfacePoutre * 1.1; // Marge 10%
+            const surfacePoutre = (p.sectionL + (2 * p.sectionH)) * p.longueur * 1.1;
+            surfaceCoffrageTotal += surfacePoutre;
+            results.categories.poutres.coffrage += surfacePoutre;
         });
 
         // Calcul Poteaux
@@ -688,75 +730,105 @@ const App = () => {
             const q = p.quantity || 1;
             const v = p.sectionL * p.sectionl * p.hauteur * q;
             volBetonTotal += v;
-            kgCimentTotal += v * RATIOS.CIMENT_BETON;
+            const ciment = v * RATIOS.CIMENT_BETON;
+            const sable = v * RATIOS.SABLE_BETON;
+            const gravier = v * RATIOS.GRAVIER_BETON;
+            kgCimentTotal += ciment;
 
-            // Acier Vertical
+            results.categories.poteaux.ciment += ciment;
+            results.categories.poteaux.sable += sable;
+            results.categories.poteaux.gravier += gravier;
+
             const kgVert = p.nbBarres * p.hauteur * (STEEL_WEIGHTS[p.diametre] || 0.888) * q;
-
-            // Acier Cadres
             const perimetre = (p.sectionL + p.sectionl) * 2;
             const nbCadres = Math.ceil(p.hauteur / (p.espacementCadre || 0.20)) + 1;
             const kgCadres = nbCadres * perimetre * (STEEL_WEIGHTS[p.diametreCadre] || 0.222) * q;
-
             kgAcierTotal += (kgVert + kgCadres);
+            addSteel('poteaux', p.diametre, kgVert);
+            addSteel('poteaux', p.diametreCadre, kgCadres);
 
-            // Coffrage (4 faces)
-            const surface = perimetre * p.hauteur * q;
-            surfaceCoffrageTotal += surface * 1.1; // Marge 10%
+            const surface = perimetre * p.hauteur * q * 1.1;
+            surfaceCoffrageTotal += surface;
+            results.categories.poteaux.coffrage += surface;
         });
 
         // Calcul Murs
         proj.murs.forEach(m => {
             const briqueInfo = BRICK_TYPES.find(b => b.id === m.briqueId) || BRICK_TYPES[1];
             const surfaceNette = (m.longueur * m.hauteur) - (m.ouvertures || 0);
-            nbBriquesTotal += surfaceNette / (briqueInfo.l * briqueInfo.h);
+            const nbBriques = surfaceNette / (briqueInfo.l * briqueInfo.h);
+            nbBriquesTotal += nbBriques;
+            results.categories.murs.briques += nbBriques;
+
             const qtyMortier = surfaceNette * RATIOS.MORTIER_PAR_M2_BASE * briqueInfo.mortierMult;
             volMortierTotal += qtyMortier;
-            kgCimentTotal += qtyMortier * RATIOS.CIMENT_BETON;
+            const ciment = qtyMortier * RATIOS.CIMENT_BETON;
+            const sable = qtyMortier * 1.6; // Approximatif
+            kgCimentTotal += ciment;
+            results.categories.murs.ciment += ciment;
+            results.categories.murs.sable += qtyMortier * 1.5; // Approximation mélange mortier
         });
 
         // Calcul Dalles
         proj.dalles.forEach(d => {
             const v = d.longueur * d.largeur * d.epaisseur;
             volBetonTotal += v;
-            kgCimentTotal += v * RATIOS.CIMENT_BETON;
+            const ciment = v * RATIOS.CIMENT_BETON;
+            const sable = v * RATIOS.SABLE_BETON;
+            const gravier = v * RATIOS.GRAVIER_BETON;
+            kgCimentTotal += ciment;
 
-            // Calcul Nappe (treillis)
+            results.categories.dalles.ciment += ciment;
+            results.categories.dalles.sable += sable;
+            results.categories.dalles.gravier += gravier;
+
             const nbBarresLong = Math.ceil(d.largeur / d.maille) + 1;
             const nbBarresLarg = Math.ceil(d.longueur / d.maille) + 1;
-
             const totalLineaire = (nbBarresLong * d.longueur) + (nbBarresLarg * d.largeur);
-            kgAcierTotal += totalLineaire * (STEEL_WEIGHTS[d.diametre] || 0.395);
+            const kgAcier = totalLineaire * (STEEL_WEIGHTS[d.diametre] || 0.395);
+            kgAcierTotal += kgAcier;
+            addSteel('dalles', d.diametre, kgAcier);
 
-            // Calcul Coffrage Dalle
             const surface = d.longueur * d.largeur;
             surfaceCoffrageTotal += surface;
+            results.categories.dalles.coffrage += surface;
 
-            // Calcul Chevrons
             const espac = d.espacementEtaiement || 0.60;
-            const nbLignes = Math.ceil(d.longueur / espac) + 1;
-            const nbColonnes = Math.ceil(d.largeur / espac) + 1;
-            nbChevronsTotal += (nbLignes * nbColonnes);
+            const chev = (Math.ceil(d.longueur / espac) + 1) * (Math.ceil(d.largeur / espac) + 1);
+            nbChevronsTotal += chev;
+            results.categories.dalles.chevrons += chev;
         });
 
-        // Calcul Divers / Autre Béton
+        // Calcul Divers
         proj.divers.forEach(d => {
             const q = d.quantity || 1;
             const v = d.longueur * d.largeur * d.epaisseur * q;
             volBetonTotal += v;
             const dosage = d.dosage || 350;
-            kgCimentTotal += v * dosage;
+            const ciment = v * dosage;
+            kgCimentTotal += ciment;
+            results.categories.divers.ciment += ciment;
+            results.categories.divers.sable += v * RATIOS.SABLE_BETON;
+            results.categories.divers.gravier += v * RATIOS.GRAVIER_BETON;
 
             if (d.isReinforced && d.steelRatio) {
-                kgAcierTotal += v * d.steelRatio;
+                const kg = v * d.steelRatio;
+                kgAcierTotal += kg;
+                addSteel('divers', 10, kg); // Diamètre par défaut pour divers
             }
         });
 
         // Calcul Escaliers
         proj.escaliers.forEach(e => {
             volBetonTotal += e.volume;
-            kgCimentTotal += e.volume * e.dosage;
-            kgAcierTotal += e.volume * 80;
+            const ciment = e.volume * e.dosage;
+            kgCimentTotal += ciment;
+            results.categories.escaliers.ciment += ciment;
+            results.categories.escaliers.sable += e.volume * RATIOS.SABLE_BETON;
+            results.categories.escaliers.gravier += e.volume * RATIOS.GRAVIER_BETON;
+            const kgAcier = e.volume * 80;
+            kgAcierTotal += kgAcier;
+            addSteel('escaliers', 10, kgAcier);
         });
 
         // Calcul Toiture
@@ -765,6 +837,7 @@ const App = () => {
             const surfaceReelle = proj.toiture.surfaceAuSol / Math.cos(angleRad);
             const surfaceUtileTole = RATIOS.TOLE_LONGUEUR_STD * RATIOS.TOLE_LARGEUR_UTILE;
             nbTolesTotal = Math.ceil(surfaceReelle / surfaceUtileTole);
+            results.categories.toiture.toles = nbTolesTotal;
         }
 
         // Calcul Carrelage
@@ -773,10 +846,13 @@ const App = () => {
             surfaceCarrelageTotal += surface;
             const tile = TILE_TYPES.find(t => t.id === c.tileId) || TILE_TYPES[4];
             const surfaceCarreau = tile.l * tile.w;
-            nbCarreauxTotal += Math.ceil((surface * 1.05) / surfaceCarreau);
+            const carreaux = Math.ceil((surface * 1.05) / surfaceCarreau);
+            nbCarreauxTotal += carreaux;
+            results.categories.carrelage.surface += surface;
+            results.categories.carrelage.carreaux += carreaux;
         });
 
-        return {
+        results.global = {
             ciment: Math.ceil(kgCimentTotal / 50),
             sable: ((volBetonTotal + volMortierTotal) * RATIOS.SABLE_BETON).toFixed(2),
             gravier: (volBetonTotal * RATIOS.GRAVIER_BETON).toFixed(2),
@@ -788,6 +864,8 @@ const App = () => {
             surfaceCarrelage: surfaceCarrelageTotal.toFixed(2),
             nbCarreaux: nbCarreauxTotal
         };
+
+        return results;
     };
 
     // --- QUICK CALC STATE (Independent from Project) ---
@@ -1088,17 +1166,90 @@ const App = () => {
         );
     };
 
-    const ResultsSummary = ({ totals }) => (
-        <div className="mb-6 animate-in slide-in-from-top-4 fade-in duration-500">
-            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Résultats en Direct (Calcul Rapide)</h3>
-            <div className="grid grid-cols-2 gap-3">
-                <StatCard title="Ciment" value={totals.ciment} unit="Sacs" color="bg-blue-600" />
-                <StatCard title="Briques" value={totals.briques} unit="Unités" color="bg-red-600" />
-                <StatCard title="Sable" value={totals.sable} unit="m³" color="bg-amber-500" />
-                <StatCard title="Gravier" value={totals.gravier} unit="m³" color="bg-zinc-500" />
+    const DetailedMaterialSummary = ({ totals }) => {
+        if (!totals || !totals.categories) return null;
+
+        const catNames = {
+            semelles: 'Fondations',
+            poteaux: 'Poteaux',
+            poutres: 'Poutres / Chaînages',
+            murs: 'Élévation / Murs',
+            dalles: 'Dalles Béton',
+            toiture: 'Toiture',
+            carrelage: 'Carrelage',
+            escaliers: 'Escaliers Béton',
+            divers: 'Divers Travaux'
+        };
+
+        const formatMaterial = (catKey, data) => {
+            const parts = [];
+            if (data.ciment > 0) parts.push(`${Math.ceil(data.ciment / 50)} sacs ciment`);
+            if (data.briques > 0) parts.push(`${Math.ceil(data.briques)} briques`);
+            if (data.sable > 0) parts.push(`${data.sable.toFixed(2)}m³ sable`);
+            if (data.gravier > 0) parts.push(`${data.gravier.toFixed(2)}m³ gravier`);
+            if (data.toles > 0) parts.push(`${data.toles} tôles`);
+            if (data.carreaux > 0) parts.push(`${data.carreaux} carreaux`);
+            if (data.coffrage > 0) parts.push(`${data.coffrage.toFixed(1)}m² coffrage`);
+            if (data.chevrons > 0) parts.push(`${data.chevrons} chevrons`);
+
+            if (data.acier) {
+                Object.entries(data.acier).forEach(([diam, kg]) => {
+                    if (kg > 0) {
+                        const weightPerBar = 12 * (STEEL_WEIGHTS[diam] || 1);
+                        const nbBars = Math.ceil(kg / weightPerBar);
+                        parts.push(`${nbBars} barres Φ${diam}`);
+                    }
+                });
+            }
+
+            return parts.length > 0 ? parts.join(', ') : null;
+        };
+
+        const activeCats = Object.entries(totals.categories).filter(([k, v]) => {
+            return formatMaterial(k, v) !== null;
+        });
+
+        if (activeCats.length === 0) return null;
+
+        return (
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6 space-y-4 animate-in slide-in-from-right duration-300">
+                <div className="flex items-center gap-3 border-b border-gray-50 pb-3">
+                    <div className="bg-blue-600 p-2 rounded-lg text-white">
+                        <List size={18} />
+                    </div>
+                    <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight">Résumé par Élément</h3>
+                </div>
+                <div className="space-y-3">
+                    {activeCats.map(([key, data]) => {
+                        const materialString = formatMaterial(key, data);
+                        return (
+                            <div key={key} className="flex flex-col gap-1 p-3 rounded-xl bg-gray-50 border border-gray-100">
+                                <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{catNames[key] || key}</span>
+                                <p className="text-xs font-bold text-gray-700 leading-relaxed capitalize">
+                                    {materialString}
+                                </p>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
+
+    const ResultsSummary = ({ totals }) => {
+        const t = totals.global || totals;
+        return (
+            <div className="mb-6 animate-in slide-in-from-top-4 fade-in duration-500">
+                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Résultats Global (Tout Inclus)</h3>
+                <div className="grid grid-cols-2 gap-3">
+                    <StatCard title="Ciment" value={t.ciment} unit="Sacs" color="bg-blue-600" />
+                    <StatCard title="Briques" value={t.briques} unit="Unités" color="bg-red-600" />
+                    <StatCard title="Sable" value={t.sable} unit="m³" color="bg-amber-500" />
+                    <StatCard title="Gravier" value={t.gravier} unit="m³" color="bg-zinc-500" />
+                </div>
+            </div>
+        );
+    };
 
     const ProjectsView = () => {
         // Use parent's projectViewMode instead of local state
@@ -1394,52 +1545,8 @@ const App = () => {
                 {/* RESULTS SUMMARY */}
                 <ResultsSummary totals={totals} />
 
-                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-6">
-                    <div className="space-y-3">
-                        <input
-                            type="text"
-                            placeholder="Nom du projet..."
-                            className="w-full p-2 bg-white border border-blue-200 rounded text-xs"
-                            value={projectName}
-                            onChange={(e) => setProjectName(e.target.value)}
-                        />
-
-                        <div className="grid grid-cols-3 gap-2">
-                            <div>
-                                <label className="text-[9px] text-blue-700 font-bold uppercase block mb-1">Type</label>
-                                <select
-                                    className="w-full p-2 bg-white border border-blue-200 rounded text-xs font-bold"
-                                    value={projectType}
-                                    onChange={(e) => setProjectType(e.target.value)}
-                                >
-                                    {buildingTypes.map(t => (
-                                        <option key={t.id} value={t.id}>{t.icon} {t.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-[9px] text-blue-700 font-bold uppercase block mb-1">Étages</label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    className="w-full p-2 bg-white border border-blue-200 rounded text-xs"
-                                    value={projectFloors}
-                                    onChange={(e) => setProjectFloors(parseInt(e.target.value) || 1)}
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[9px] text-blue-700 font-bold uppercase block mb-1">Pièces</label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    className="w-full p-2 bg-white border border-blue-200 rounded text-xs"
-                                    value={projectRooms}
-                                    onChange={(e) => setProjectRooms(parseInt(e.target.value) || 1)}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                {/* DETAILED SUMMARY PER ELEMENT */}
+                <DetailedMaterialSummary totals={totals} />
 
                 <button
                     onClick={() => setShowPlanTakeoff(true)}
@@ -3733,15 +3840,15 @@ const App = () => {
 
 
             <div className="grid grid-cols-2 gap-3">
-                <StatCard title="Ciment" value={totals.ciment} unit="Sacs 50kg" color="bg-blue-600" />
-                <StatCard title="Briques" value={totals.briques} unit="Unités" color="bg-red-600" />
-                <StatCard title="Sable" value={totals.sable} unit="m³" extra={` (~${(totals.sable * 1.6).toFixed(1)}T)`} color="bg-amber-500" />
-                <StatCard title="Gravier" value={totals.gravier} unit="m³" extra={` (~${(totals.gravier * 1.5).toFixed(1)}T)`} color="bg-zinc-500" />
-                <StatCard title="Acier total" value={totals.acier} unit="kg" extra={` (~${(totals.acier / 1000).toFixed(2)}T)`} color="bg-slate-800" />
-                <StatCard title="Coffrage Bois" value={totals.coffrage} unit="m²" color="bg-amber-700" />
-                <StatCard title="Tôles" value={totals.toles} unit="Feuilles" color="bg-cyan-600" />
-                <StatCard title="Chevrons" value={totals.chevrons} unit="Unités" color="bg-lime-600" />
-                <StatCard title="Carrelage" value={totals.nbCarreaux} unit="Carreaux" extra={` (${totals.surfaceCarrelage} m²)`} color="bg-emerald-600" />
+                <StatCard title="Ciment" value={totals.global?.ciment || totals.ciment} unit="Sacs 50kg" color="bg-blue-600" />
+                <StatCard title="Briques" value={totals.global?.briques || totals.briques} unit="Unités" color="bg-red-600" />
+                <StatCard title="Sable" value={totals.global?.sable || totals.sable} unit="m³" extra={` (~${((totals.global?.sable || totals.sable) * 1.6).toFixed(1)}T)`} color="bg-amber-500" />
+                <StatCard title="Gravier" value={totals.global?.gravier || totals.gravier} unit="m³" extra={` (~${((totals.global?.gravier || totals.gravier) * 1.5).toFixed(1)}T)`} color="bg-zinc-500" />
+                <StatCard title="Acier total" value={totals.global?.acier || totals.acier} unit="kg" extra={` (~${((totals.global?.acier || totals.acier) / 1000).toFixed(2)}T)`} color="bg-slate-800" />
+                <StatCard title="Coffrage Bois" value={totals.global?.coffrage || totals.coffrage} unit="m²" color="bg-amber-700" />
+                <StatCard title="Tôles" value={totals.global?.toles || totals.toles} unit="Feuilles" color="bg-cyan-600" />
+                <StatCard title="Chevrons" value={totals.global?.chevrons || totals.chevrons} unit="Unités" color="bg-lime-600" />
+                <StatCard title="Carrelage" value={totals.global?.nbCarreaux || totals.nbCarreaux} unit="Carreaux" extra={` (${(totals.global?.surfaceCarrelage || totals.surfaceCarrelage)} m²)`} color="bg-emerald-600" />
             </div>
 
             <div className="bg-white border p-3 rounded-xl flex items-start gap-3 shadow-sm">
