@@ -199,7 +199,11 @@ const App = () => {
                 // Fetch profile data
                 supabase.from('profiles').select('username').eq('id', session.user.id).single()
                     .then(({ data }) => {
-                        setCurrentUser({ ...session.user, name: data?.username || session.user.email.split('@')[0] });
+                        const displayName = data?.username ||
+                            session.user.user_metadata?.full_name ||
+                            session.user.user_metadata?.name ||
+                            session.user.email.split('@')[0];
+                        setCurrentUser({ ...session.user, name: displayName });
                     });
             } else {
                 setCurrentUser(null);
@@ -211,7 +215,11 @@ const App = () => {
             if (session?.user) {
                 supabase.from('profiles').select('username').eq('id', session.user.id).single()
                     .then(({ data }) => {
-                        setCurrentUser({ ...session.user, name: data?.username || session.user.email.split('@')[0] });
+                        const displayName = data?.username ||
+                            session.user.user_metadata?.full_name ||
+                            session.user.user_metadata?.name ||
+                            session.user.email.split('@')[0];
+                        setCurrentUser({ ...session.user, name: displayName });
                     });
             } else {
                 setCurrentUser(null);
