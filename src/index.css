@@ -1,6 +1,6 @@
-
-
-
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 /* Print Styles for Professional Quote Export */
 @media print {
     @page {
