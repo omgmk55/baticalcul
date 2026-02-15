@@ -35,7 +35,13 @@ import {
     Shield,
     Monitor,
     Smartphone,
-    Send
+    Send,
+    Ruler,
+    RefreshCcw,
+    Maximize2,
+    Minimize2,
+    MousePointer2,
+    List
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import jsPDF from 'jspdf';
@@ -133,13 +139,277 @@ const NavItem = ({ active, icon, label, onClick }) => (
 );
 
 const ListItem = ({ title, details, color, onRemove }) => (
-    <div className={`flex justify-between items-center bg-white p-3 rounded-xl border border-gray-100 shadow-sm border-l-4 ${color} transition-all hover:shadow-md`}>
+    <div className={`flex justify-between items-center bg-white p-3 rounded-xl border border-gray-100 shadow-sm border-l-4 ${color} transition-all hover:shadow-md group`}>
         <div className="flex flex-col">
             <span className="font-bold text-gray-800 text-[11px] uppercase tracking-wide">{title}</span>
             <span className="text-[9px] text-gray-500 font-medium">{details}</span>
         </div>
+        {onRemove && (
+            <button onClick={onRemove} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                <Trash2 size={14} />
+            </button>
+        )}
     </div>
 );
+
+// --- PLAN TAKEOFF COMPONENT ---
+const PlanTakeoff = ({ onExport, onClose }) => {
+    const [image, setImage] = useState(null);
+    const [scale, setScale] = useState(null); // pixels per meter
+    const [mode, setMode] = useState('none'); // 'calibrate' | 'length' | 'area'
+    const [points, setPoints] = useState([]);
+    const [calibratingLine, setCalibratingLine] = useState(null);
+    const [measurements, setMeasurements] = useState([]); // { type, value, points }
+    const canvasRef = React.useRef(null);
+    const containerRef = React.useRef(null);
+
+    const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => setImage(img);
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    useEffect(() => {
+        if (!image || !canvasRef.current) return;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+
+        // Fit image to canvas while maintaining aspect ratio
+        const ratio = Math.min(canvas.width / image.width, canvas.height / image.height);
+        const imgWidth = image.width * ratio;
+        const imgHeight = image.height * ratio;
+        const x = (canvas.width - imgWidth) / 2;
+        const y = (canvas.height - imgHeight) / 2;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(image, x, y, imgWidth, imgHeight);
+
+        // Draw measurements
+        measurements.forEach(m => {
+            ctx.beginPath();
+            ctx.strokeStyle = m.type === 'length' ? '#3b82f6' : '#10b981';
+            ctx.lineWidth = 3;
+            m.points.forEach((p, i) => {
+                if (i === 0) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
+            });
+            if (m.type === 'area') ctx.closePath();
+            ctx.stroke();
+            if (m.type === 'area') {
+                ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
+                ctx.fill();
+            }
+        });
+
+        // Draw current points
+        if (points.length > 0) {
+            ctx.beginPath();
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 2;
+            points.forEach((p, i) => {
+                if (i === 0) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
+            });
+            ctx.stroke();
+            points.forEach(p => {
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        // Draw calibration line
+        if (calibratingLine) {
+            ctx.beginPath();
+            ctx.strokeStyle = '#f59e0b';
+            ctx.setLineDash([5, 5]);
+            ctx.moveTo(calibratingLine.start.x, calibratingLine.start.y);
+            ctx.lineTo(calibratingLine.end.x, calibratingLine.end.y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+    }, [image, measurements, points, calibratingLine]);
+
+    const handleCanvasClick = (e) => {
+        if (!image) return;
+        const rect = canvasRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        if (mode === 'calibrate') {
+            if (!calibratingLine) {
+                setCalibratingLine({ start: { x, y }, end: { x, y } });
+            } else {
+                const p1 = calibratingLine.start;
+                const pxDist = Math.sqrt(Math.pow(x - p1.x, 2) + Math.pow(y - p1.y, 2));
+                const realDist = prompt("Entrez la longueur réelle en mètres pour cette ligne :");
+                if (realDist && !isNaN(realDist)) {
+                    setScale(pxDist / parseFloat(realDist));
+                    alert(`Échelle calibrée !`);
+                }
+                setCalibratingLine(null);
+                setMode('none');
+            }
+        } else if (mode === 'length' || mode === 'area') {
+            setPoints([...points, { x, y }]);
+        }
+    };
+
+    const finishMeasurement = () => {
+        if (!scale) return alert("Veuillez d'abord calibrer l'échelle.");
+        if (points.length < 2) return;
+
+        let value = 0;
+        if (mode === 'length') {
+            for (let i = 0; i < points.length - 1; i++) {
+                const d = Math.sqrt(Math.pow(points[i + 1].x - points[i].x, 2) + Math.pow(points[i + 1].y - points[i].y, 2));
+                value += d / scale;
+            }
+        } else if (mode === 'area') {
+            let area = 0;
+            for (let i = 0; i < points.length; i++) {
+                const j = (i + 1) % points.length;
+                area += points[i].x * points[j].y;
+                area -= points[j].x * points[i].y;
+            }
+            value = Math.abs(area) / 2 / Math.pow(scale, 2);
+        }
+
+        setMeasurements([...measurements, { type: mode, value, points: [...points] }]);
+        setPoints([]);
+        setMode('none');
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/90 z-[100] flex flex-col p-2 sm:p-4 animate-in fade-in duration-300 overflow-hidden">
+            <header className="flex justify-between items-center mb-2 sm:mb-4">
+                <div className="flex items-center gap-3">
+                    <div className="bg-blue-600 p-2 rounded-lg text-white">
+                        <Ruler size={20} />
+                    </div>
+                    <div>
+                        <h2 className="text-white font-black uppercase tracking-tight text-sm sm:text-lg leading-tight">Mesure sur Plan</h2>
+                        <p className="text-blue-300 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest">Digital Take-off Tool</p>
+                    </div>
+                </div>
+                <button onClick={onClose} className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full transition-colors">
+                    <X size={20} />
+                </button>
+            </header>
+
+            <div className="flex-1 flex flex-col sm:flex-row gap-2 sm:gap-4 overflow-hidden">
+                {/* TOOLBAR */}
+                <div className="flex sm:flex-col gap-2 shrink-0 overflow-x-auto sm:overflow-visible pb-2 sm:pb-0">
+                    <button
+                        onClick={() => setMode('calibrate')}
+                        className={`p-2 sm:p-3 rounded-xl flex flex-col items-center gap-1 transition-all ${mode === 'calibrate' ? 'bg-amber-500 text-white shadow-lg' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                    >
+                        <Maximize2 size={20} />
+                        <span className="text-[7px] sm:text-[8px] font-black uppercase">Échelle</span>
+                    </button>
+                    <button
+                        onClick={() => setMode('length')}
+                        className={`p-2 sm:p-3 rounded-xl flex flex-col items-center gap-1 transition-all ${mode === 'length' ? 'bg-blue-500 text-white shadow-lg' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                    >
+                        <Ruler size={20} />
+                        <span className="text-[7px] sm:text-[8px] font-black uppercase">Murs</span>
+                    </button>
+                    <button
+                        onClick={() => setMode('area')}
+                        className={`p-2 sm:p-3 rounded-xl flex flex-col items-center gap-1 transition-all ${mode === 'area' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                    >
+                        <Square size={20} />
+                        <span className="text-[7px] sm:text-[8px] font-black uppercase">Surface</span>
+                    </button>
+                    <button
+                        onClick={() => { setMeasurements([]); setScale(null); setImage(null); }}
+                        className="p-2 sm:p-3 rounded-xl flex flex-col items-center gap-1 bg-red-500/20 text-red-400 hover:bg-red-500/40 transition-all sm:mt-auto"
+                    >
+                        <RefreshCcw size={20} />
+                        <span className="text-[7px] sm:text-[8px] font-black uppercase">Reset</span>
+                    </button>
+                </div>
+
+                {/* CANVAS AREA */}
+                <div ref={containerRef} className="flex-1 bg-zinc-900 rounded-2xl border border-white/10 relative overflow-hidden flex items-center justify-center">
+                    {!image ? (
+                        <div className="text-center p-4">
+                            <Plus size={32} className="text-white/20 mx-auto mb-4" />
+                            <h3 className="text-white text-xs sm:text-sm font-bold mb-4 italic uppercase tracking-widest">Glisser ou uploader un plan</h3>
+                            <label className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold text-[10px] cursor-pointer transition-all">
+                                CHOISIR UN FICHIER
+                                <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
+                            </label>
+                        </div>
+                    ) : (
+                        <canvas
+                            ref={canvasRef}
+                            width={containerRef.current?.clientWidth || 800}
+                            height={containerRef.current?.clientHeight || 600}
+                            onClick={handleCanvasClick}
+                            className={`cursor-crosshair w-full h-full object-contain`}
+                        />
+                    )}
+
+                    {mode !== 'none' && (
+                        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full shadow-2xl flex items-center gap-3 z-10">
+                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                            <span className="text-[8px] sm:text-[10px] font-black text-gray-900 uppercase tracking-widest">
+                                {mode === 'calibrate' ? 'DESSINEZ UNE LIGNE RÉFÉRENCE' : `MESURE EN COURS (${points.length} pts)`}
+                            </span>
+                            {points.length > 1 && (
+                                <button onClick={finishMeasurement} className="bg-blue-600 text-white px-2 py-0.5 rounded-full text-[8px] font-black">VALIDER</button>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* SIDEBAR */}
+                <div className="w-full sm:w-64 bg-zinc-900 rounded-2xl border border-white/10 p-4 flex flex-col overflow-hidden">
+                    <h3 className="text-white font-black text-[10px] uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <List size={14} className="text-blue-400" /> Résultats
+                    </h3>
+
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                        {measurements.length === 0 ? (
+                            <p className="text-[10px] text-white/20 font-bold uppercase text-center mt-10 tracking-widest">En attente de mesures...</p>
+                        ) : (
+                            measurements.map((m, i) => (
+                                <div key={i} className={`p-2 rounded-lg border-l-4 ${m.type === 'length' ? 'bg-blue-500/10 border-blue-500' : 'bg-emerald-500/10 border-emerald-500'}`}>
+                                    <div className="flex justify-between items-center text-[7px] font-black text-white/40 mb-1">
+                                        <span>{m.type === 'length' ? 'MUR / LONGUEUR' : 'SURFACE / DALLE'}</span>
+                                        <button onClick={() => setMeasurements(measurements.filter((_, idx) => idx !== i))} className="text-red-400"><Trash2 size={10} /></button>
+                                    </div>
+                                    <div className="text-white font-black text-sm">
+                                        {m.value.toFixed(2)} {m.type === 'length' ? 'm' : 'm²'}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                        <button
+                            disabled={measurements.length === 0}
+                            onClick={() => onExport(measurements)}
+                            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-30 text-white p-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
+                        >
+                            Exporter au Projet
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const ADMIN_EMAIL = 'jeancymif@gmail.com';
 
@@ -194,6 +464,7 @@ const App = () => {
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
     const [showProfileMenu, setShowProfileMenu] = useState(false);
+    const [showPlanTakeoff, setShowPlanTakeoff] = useState(false);
 
     // Initialize Supabase Auth
     useEffect(() => {
@@ -281,6 +552,42 @@ const App = () => {
         setProjectRooms(projectToLoad.rooms || 1);
         setActiveConstructionForms(projectToLoad.activeForms || []);
         setProject(projectToLoad.projectData);
+    };
+
+    const handlePlanExport = (measurements) => {
+        const newMurs = [...project.murs];
+        const newDalles = [...project.dalles];
+
+        measurements.forEach(m => {
+            if (m.type === 'length') {
+                newMurs.push({
+                    id: Date.now() + Math.random(),
+                    longueur: parseFloat(m.value.toFixed(2)),
+                    hauteur: 3, // Default height
+                    briqueId: 'b15' // Default brick type
+                });
+            } else if (m.type === 'area') {
+                // Approximate l and w for the area (assume square)
+                const side = Math.sqrt(m.value);
+                newDalles.push({
+                    id: Date.now() + Math.random(),
+                    longueur: parseFloat(side.toFixed(2)),
+                    largeur: parseFloat(side.toFixed(2)),
+                    epaisseur: 0.15, // Default thickness
+                    boardId: 'p4_20'
+                });
+            }
+        });
+
+        if (!activeConstructionForms.includes('murs') && newMurs.length > project.murs.length) {
+            setActiveConstructionForms(prev => [...prev, 'murs']);
+        }
+        if (!activeConstructionForms.includes('dalles') && newDalles.length > project.dalles.length) {
+            setActiveConstructionForms(prev => [...prev, 'dalles']);
+        }
+
+        setProject({ ...project, murs: newMurs, dalles: newDalles });
+        setShowPlanTakeoff(false);
     };
 
     const handleDeleteProject = (projectId) => {
@@ -1133,6 +1440,14 @@ const App = () => {
                         </div>
                     </div>
                 </div>
+
+                <button
+                    onClick={() => setShowPlanTakeoff(true)}
+                    className="w-full bg-gradient-to-r from-blue-700 to-indigo-700 text-white p-3 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-lg hover:shadow-blue-200 transition-all active:scale-95 mb-4"
+                >
+                    <Ruler size={16} />
+                    Mesurer sur Plan (Digital Take-off)
+                </button>
 
                 {/* Construction Forms Section - Selective */}
                 <div className="bg-gradient-to-br from-gray-50 to-blue-50 p-4 rounded-xl border border-gray-200">
@@ -3758,6 +4073,13 @@ const App = () => {
             </nav>
 
             {showAuthModal && <AuthModal />}
+
+            {showPlanTakeoff && (
+                <PlanTakeoff
+                    onClose={() => setShowPlanTakeoff(false)}
+                    onExport={handlePlanExport}
+                />
+            )}
         </div>
     );
 };
