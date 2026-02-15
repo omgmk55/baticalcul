@@ -2475,7 +2475,7 @@ const App = () => {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-4">
-                                            <span className="font-black text-gray-900 text-sm hidden sm:block">{quote.total.toLocaleString()} $</span>
+                                            <span className="font-black text-gray-900 text-sm hidden sm:block">{quote.total.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
                                             <button
                                                 onClick={(e) => handleDeleteQuote(quote.id, e)}
                                                 className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
@@ -2495,6 +2495,23 @@ const App = () => {
 
         return (
             <div className="p-4 bg-gray-50 min-h-screen pb-32 font-sans relative">
+                {/* Print Styles */}
+                <style>{`
+                    @media print {
+                        .no-print { display: none !important; }
+                        body { background: white !important; padding: 0 !important; margin: 0 !important; }
+                        .printable-sheet { 
+                            box-shadow: none !important; 
+                            border: none !important; 
+                            width: 100% !important; 
+                            max-width: none !important;
+                            padding: 0 !important;
+                        }
+                        @page { margin: 2cm; }
+                        nav, button, footer { display: none !important; }
+                    }
+                `}</style>
+
                 {/* Header Actions */}
                 <div className="flex justify-between items-center mb-6 no-print">
                     <button
@@ -2514,31 +2531,33 @@ const App = () => {
                             onClick={() => window.print()}
                             className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 hover:bg-blue-700 transition"
                         >
-                            <Printer size={16} /> IMPRIMER
+                            <Printer size={16} /> EXPORTER PDF
                         </button>
                     </div>
                 </div>
 
                 {/* SAVE MODAL */}
-                {showSaveModal && (
-                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-sm animate-in fade-in zoom-in-95">
-                            <h3 className="text-lg font-bold text-gray-800 mb-4">Sauvegarder le Devis</h3>
-                            <input
-                                autoFocus
-                                type="text"
-                                placeholder="Nom du devis (ex: Villa M. Dupont)"
-                                className="w-full p-3 border border-gray-300 rounded-xl mb-4 text-sm font-medium focus:border-blue-500 outline-none"
-                                value={quoteName}
-                                onChange={e => setQuoteName(e.target.value)}
-                            />
-                            <div className="flex gap-2 justify-end">
-                                <button onClick={() => setShowSaveModal(false)} className="px-4 py-2 text-gray-500 font-bold text-xs hover:bg-gray-100 rounded-lg">ANNULER</button>
-                                <button onClick={handleSaveQuote} disabled={!quoteName.trim()} className="px-4 py-2 bg-green-600 text-white font-bold text-xs rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed">ENREGISTRER</button>
+                {
+                    showSaveModal && (
+                        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                            <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-sm animate-in fade-in zoom-in-95">
+                                <h3 className="text-lg font-bold text-gray-800 mb-4">Sauvegarder le Devis</h3>
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    placeholder="Nom du devis (ex: Villa M. Dupont)"
+                                    className="w-full p-3 border border-gray-300 rounded-xl mb-4 text-sm font-medium focus:border-blue-500 outline-none"
+                                    value={quoteName}
+                                    onChange={e => setQuoteName(e.target.value)}
+                                />
+                                <div className="flex gap-2 justify-end">
+                                    <button onClick={() => setShowSaveModal(false)} className="px-4 py-2 text-gray-500 font-bold text-xs hover:bg-gray-100 rounded-lg">ANNULER</button>
+                                    <button onClick={handleSaveQuote} disabled={!quoteName.trim()} className="px-4 py-2 bg-green-600 text-white font-bold text-xs rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed">ENREGISTRER</button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )
+                }
 
                 {/* DEVIS PAPER SHEET */}
                 <div className="bg-white p-6 md:p-8 rounded-none md:rounded-xl shadow-lg border border-gray-200 text-gray-800 max-w-4xl mx-auto printable-sheet">
@@ -2656,7 +2675,7 @@ const App = () => {
                                                                 />
                                                             </td>
                                                             <td className="py-2 px-2 text-right font-bold text-gray-800">
-                                                                {(item.qty * item.price).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                                                                {(item.qty * item.price).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                                                             </td>
                                                         </>
                                                     )}
@@ -2675,17 +2694,17 @@ const App = () => {
                             <div className="w-full md:w-80 space-y-2">
                                 <div className="flex justify-between text-gray-600 text-sm">
                                     <span>Total HT</span>
-                                    <span className="font-bold">{items.reduce((sum, i) => sum + (i.qty * i.price), 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
+                                    <span className="font-bold">{items.reduce((sum, i) => sum + (i.qty * i.price), 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
                                 </div>
                                 <div className="flex justify-between text-gray-600 text-sm">
                                     <span>TVA ({quoteMetadata.tauxTVA}%)</span>
-                                    <span className="font-bold">{(items.reduce((sum, i) => sum + (i.qty * i.price), 0) * (quoteMetadata.tauxTVA / 100)).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
+                                    <span className="font-bold">{(items.reduce((sum, i) => sum + (i.qty * i.price), 0) * (quoteMetadata.tauxTVA / 100)).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
                                 </div>
                                 <div className="border-t border-gray-200 my-2"></div>
                                 <div className="bg-blue-600 text-white p-4 rounded-xl shadow-lg flex justify-between items-center">
                                     <span className="text-blue-100 font-bold uppercase tracking-wider text-sm">Total TTC</span>
                                     <span className="text-2xl font-black">
-                                        {(items.reduce((sum, i) => sum + (i.qty * i.price), 0) * (1 + quoteMetadata.tauxTVA / 100)).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                                        {(items.reduce((sum, i) => sum + (i.qty * i.price), 0) * (1 + quoteMetadata.tauxTVA / 100)).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                                     </span>
                                 </div>
                             </div>
@@ -2714,7 +2733,7 @@ const App = () => {
                         <div>Signature Client ("Bon pour accord")</div>
                     </div>
                 </div>
-            </div>
+            </div >
         );
     };
 
