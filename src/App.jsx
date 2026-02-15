@@ -66,8 +66,6 @@ const BRICK_TYPES = [
     { id: 'b20', label: 'Brique de 20', l: 0.4, h: 0.2, e: 0.20, mortierMult: 1.3 },
 ];
 
-// Admin email constant
-const ADMIN_EMAIL = 'jeancymif@gmail.com';
 
 const BOARD_TYPES = [
     { id: 'p3_15', label: 'Planche 3m x 15cm', l: 3.0, w: 0.15 },
@@ -137,113 +135,11 @@ const ListItem = ({ title, details, color, onRemove }) => (
             <span className="font-bold text-gray-800 text-[11px] uppercase tracking-wide">{title}</span>
             <span className="text-[9px] text-gray-500 font-medium">{details}</span>
         </div>
-        <button onClick={onRemove} className="p-2 text-red-300 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
     </div>
 );
 
-const AdminView = () => {
-    const [users, setUsers] = useState([]);
-    const [loading, setLoading] = useState(true);
+const ADMIN_EMAIL = 'jeancymif@gmail.com';
 
-    useEffect(() => {
-        fetchUsers();
-    }, []);
-
-    const fetchUsers = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .order('updated_at', { ascending: false });
-
-            if (error) throw error;
-            setUsers(data || []);
-        } catch (error) {
-            console.error('Error fetching users:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="space-y-8 animate-in fade-in duration-500">
-            <header>
-                <div className="flex items-center gap-3 mb-2">
-                    <div className="bg-purple-100 p-3 rounded-2xl">
-                        <Shield size={32} className="text-purple-600" />
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-black text-gray-900 tracking-tight">Administration</h1>
-                        <p className="text-gray-500 font-medium">Gestion des utilisateurs et statistiques</p>
-                    </div>
-                </div>
-            </header>
-
-            <div className="grid md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-bold text-gray-500 text-sm uppercase tracking-wider">Utilisateurs Total</h3>
-                        <Users size={20} className="text-blue-500" />
-                    </div>
-                    <p className="text-4xl font-black text-gray-900">{users.length}</p>
-                    <p className="text-xs text-green-600 font-bold mt-2 flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                        Inscrits sur la plateforme
-                    </p>
-                </div>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 border-b border-gray-50 flex justify-between items-center">
-                    <h3 className="font-bold text-lg text-gray-900">Utilisateurs Inscrits</h3>
-                    <button onClick={fetchUsers} className="text-blue-600 hover:text-blue-700 font-bold text-sm">
-                        Actualiser
-                    </button>
-                </div>
-
-                {loading ? (
-                    <div className="p-12 text-center text-gray-400">Chargement...</div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider font-bold text-xs">
-                                <tr>
-                                    <th className="p-4">Email</th>
-                                    <th className="p-4">Nom</th>
-                                    <th className="p-4">Date d'inscription</th>
-                                    <th className="p-4 text-right">ID</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {users.map((user) => (
-                                    <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="p-4 font-bold text-gray-900">{user.email || 'Email non disponible'}</td>
-                                        <td className="p-4 text-gray-600 font-medium">{user.username || '-'}</td>
-                                        <td className="p-4 text-gray-500">
-                                            {new Date(user.updated_at || Date.now()).toLocaleDateString('fr-FR', {
-                                                year: 'numeric',
-                                                month: 'long',
-                                                day: 'numeric',
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            })}
-                                        </td>
-                                        <td className="p-4 text-right text-xs text-gray-400 font-mono">{user.id.slice(0, 8)}...</td>
-                                    </tr>
-                                ))}
-                                {users.length === 0 && (
-                                    <tr>
-                                        <td colSpan="4" className="p-8 text-center text-gray-500">Aucun utilisateur trouvé</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
 
 const App = () => {
     const [activeTab, setActiveTab] = useState('dashboard');
