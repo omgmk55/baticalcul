@@ -2498,25 +2498,34 @@ const App = () => {
                 {/* Print Styles */}
                 <style>{`
                     @media print {
-                        .no-print, nav, button, .floating-forum-button { display: none !important; }
+                        /* Hide everything by default */
+                        body * { visibility: hidden !important; }
+                        
+                        /* Show only the devis sheet and its children */
+                        .printable-sheet, .printable-sheet * { visibility: visible !important; }
+                        
+                        /* Position the sheet at the top of the print page */
+                        .printable-sheet {
+                            position: absolute !important;
+                            left: 0 !important;
+                            top: 0 !important;
+                            width: 100% !important;
+                            visibility: visible !important;
+                            box-shadow: none !important;
+                            border: none !important;
+                            background: white !important;
+                        }
+
+                        /* Final cleanup: hide specific elements even if visible by rule above */
+                        .no-print, nav, button, .lucide, .fixed, .sticky { display: none !important; }
+                        
                         body, html { 
                             background: white !important; 
-                            margin: 0 !important; 
-                            padding: 0 !important; 
                             height: auto !important;
                             overflow: visible !important;
                         }
-                        .printable-sheet { 
-                            box-shadow: none !important; 
-                            border: none !important; 
-                            width: 100% !important; 
-                            max-width: none !important;
-                            margin: 0 !important;
-                            padding: 2px !important;
-                            visibility: visible !important;
-                            display: block !important;
-                        }
-                        @page { margin: 1.5cm; }
+                        
+                        @page { margin: 1cm; }
                         * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; }
                     }
                 `}</style>
