@@ -38,6 +38,8 @@ import {
     Send
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 // --- CONFIGURATIONS TECHNIQUES ---
 const RATIOS = {
@@ -2380,6 +2382,40 @@ const App = () => {
             setViewMode('editor');
         };
 
+        const handleExportPDF = async () => {
+            const element = document.querySelector('.printable-sheet');
+            if (!element) return;
+
+            // Show a "loading" state ideally, or just proceed
+            const originalStyle = element.style.cssText;
+            element.style.boxShadow = 'none';
+            element.style.border = 'none';
+
+            try {
+                const canvas = await html2canvas(element, {
+                    scale: 2, // Higher scale for better quality
+                    useCORS: true,
+                    logging: false,
+                    windowWidth: element.scrollWidth,
+                    windowHeight: element.scrollHeight
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgProps = pdf.getImageProperties(imgData);
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                pdf.save(`${quoteMetadata.numero}_${clientInfo.name.replace(/\s+/g, '_')}.pdf`);
+            } catch (err) {
+                console.error("Erreur export PDF:", err);
+                alert("Erreur lors de la génération du PDF.");
+            } finally {
+                element.style.cssText = originalStyle;
+            }
+        };
+
         // --- DASHBOARD VIEW ---
         if (viewMode === 'list') {
             return (
@@ -2498,35 +2534,9 @@ const App = () => {
                 {/* Print Styles */}
                 <style>{`
                     @media print {
-                        /* Hide everything by default */
-                        body * { visibility: hidden !important; }
-                        
-                        /* Show only the devis sheet and its children */
-                        .printable-sheet, .printable-sheet * { visibility: visible !important; }
-                        
-                        /* Position the sheet at the top of the print page */
-                        .printable-sheet {
-                            position: absolute !important;
-                            left: 0 !important;
-                            top: 0 !important;
-                            width: 100% !important;
-                            visibility: visible !important;
-                            box-shadow: none !important;
-                            border: none !important;
-                            background: white !important;
-                        }
-
-                        /* Final cleanup: hide specific elements even if visible by rule above */
-                        .no-print, nav, button, .lucide, .fixed, .sticky { display: none !important; }
-                        
-                        body, html { 
-                            background: white !important; 
-                            height: auto !important;
-                            overflow: visible !important;
-                        }
-                        
-                        @page { margin: 1cm; }
-                        * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; }
+                        .no-print, nav, button, .floating-forum-button { display: none !important; }
+                        body, html { background: white !important; margin: 0 !important; padding: 0 !important; }
+                        .printable-sheet { box-shadow: none !important; border: none !important; width: 100% !important; max-width: none !important; }
                     }
                 `}</style>
 
@@ -2546,7 +2556,7 @@ const App = () => {
                             <Save size={16} /> SAUVEGARDER
                         </button>
                         <button
-                            onClick={() => window.print()}
+                            onClick={handleExportPDF}
                             className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 hover:bg-blue-700 transition"
                         >
                             <Printer size={16} /> EXPORTER PDF
