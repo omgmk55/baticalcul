@@ -1358,8 +1358,6 @@ const App = () => {
         const [newTopicContent, setNewTopicContent] = useState('');
 
         const [editingTopicId, setEditingTopicId] = useState(null);
-        const [editTopicTitle, setEditTopicTitle] = useState('');
-        const [editTopicCategory, setEditTopicCategory] = useState('');
 
         const [editingMessageId, setEditingMessageId] = useState(null);
         const [editMessageContent, setEditMessageContent] = useState('');
@@ -1368,7 +1366,29 @@ const App = () => {
 
         useEffect(() => {
             fetchTopics();
-        }, []);
+
+            // Channel for topics
+            const topicChannel = supabase.channel('forum_topics_realtime')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'topics' }, () => {
+                    fetchTopics();
+                })
+                .subscribe();
+
+            // Channel for messages (to update reply counts and chat content)
+            const messageChannel = supabase.channel('forum_messages_realtime')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
+                    fetchTopics();
+                    if (forumViewMode === 'detail' && activeTopicId) {
+                        fetchMessages(activeTopicId);
+                    }
+                })
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(topicChannel);
+                supabase.removeChannel(messageChannel);
+            };
+        }, [forumViewMode, activeTopicId]);
 
         // Real-time subscription could be added here later
         const fetchTopics = async () => {
@@ -1415,10 +1435,13 @@ const App = () => {
             try {
                 const { error } = await supabase
                     .from('topics')
-                    .update({ title: editTopicTitle, category: editTopicCategory })
+                    .update({ title: newTopicTitle, category: newTopicCategory })
                     .eq('id', id);
                 if (error) throw error;
                 setEditingTopicId(null);
+                setNewTopicTitle('');
+                setNewTopicContent('');
+                setForumViewMode('list');
                 fetchTopics();
             } catch (err) {
                 console.error("Error updating topic:", err);
@@ -1666,8 +1689,9 @@ const App = () => {
                                 <button
                                     onClick={() => {
                                         setEditingTopicId(activeTopic.id);
-                                        setEditTopicTitle(activeTopic.title);
-                                        setEditTopicCategory(activeTopic.category);
+                                        setNewTopicTitle(activeTopic.title);
+                                        setNewTopicCategory(activeTopic.category);
+                                        setNewTopicContent(activeMessages[0]?.text || ''); // Optimization: first message as content
                                         setForumViewMode('create');
                                     }}
                                     className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -1862,8 +1886,9 @@ const App = () => {
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             setEditingTopicId(topic.id);
-                                                            setEditTopicTitle(topic.title);
-                                                            setEditTopicCategory(topic.category);
+                                                            setNewTopicTitle(topic.title);
+                                                            setNewTopicCategory(topic.category);
+                                                            setNewTopicContent(''); // We don't have first message in list, so it stays empty or keep original
                                                             setForumViewMode('create');
                                                         }}
                                                         className="hover:text-blue-600 p-1"
