@@ -414,6 +414,443 @@ const PlanTakeoff = ({ onExport, onClose }) => {
 const ADMIN_EMAIL = 'jeancymif@gmail.com';
 
 
+// --- COMPOSANTS DE SAISIE ---
+const AddSemelle = ({ onAdd }) => {
+    const [temp, setTemp] = useState({ longueur: 1, largeur: 1, epaisseur: 0.3, diametre: 12 });
+    return (
+        <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
+            <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
+                <Layers size={16} className="text-blue-600" /> Semelle Isolée
+            </h3>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Longueur (m)</label>
+                    <input type="number" placeholder="L (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, longueur: parseFloat(e.target.value) || 0 })} />
+                </div>
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Largeur (m)</label>
+                    <input type="number" placeholder="l (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, largeur: parseFloat(e.target.value) || 0 })} />
+                </div>
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Épaisseur (m)</label>
+                    <input type="number" placeholder="Ep (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, epaisseur: parseFloat(e.target.value) || 0 })} />
+                </div>
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Aciers</label>
+                    <select className="w-full p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.diametre} onChange={e => setTemp({ ...temp, diametre: parseInt(e.target.value) })}>
+                        {[8, 10, 12, 14].map(d => <option key={d} value={d}>Acier Φ {d}</option>)}
+                    </select>
+                </div>
+            </div>
+            <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER SEMELLE</button>
+        </div>
+    );
+};
+
+const AddPoteau = ({ onAdd }) => {
+    const [temp, setTemp] = useState({ hauteur: 3, sectionL: 0.2, sectionl: 0.2, nbBarres: 4, diametre: 12, espacementCadre: 0.20, diametreCadre: 6, boardId: 'p4_20', quantity: 1 });
+    return (
+        <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
+            <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
+                <Grid size={16} className="text-blue-600" /> Poteau
+            </h3>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Quantité</label>
+                    <input type="number" placeholder="1" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.quantity} onChange={e => setTemp({ ...temp, quantity: parseInt(e.target.value) || 1 })} />
+                </div>
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Hauteur (m)</label>
+                    <input type="number" placeholder="H (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.hauteur} onChange={e => setTemp({ ...temp, hauteur: parseFloat(e.target.value) || 0 })} />
+                </div>
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">L (m)</label>
+                    <input type="number" placeholder="L (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.sectionL} onChange={e => setTemp({ ...temp, sectionL: parseFloat(e.target.value) || 0 })} />
+                </div>
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">l (m)</label>
+                    <input type="number" placeholder="l (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.sectionl} onChange={e => setTemp({ ...temp, sectionl: parseFloat(e.target.value) || 0 })} />
+                </div>
+                <div className="col-span-2">
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Aciers</label>
+                    <div className="flex gap-2">
+                        <input type="number" className="w-16 p-2 bg-gray-50 border rounded text-xs" value={temp.nbBarres} onChange={e => setTemp({ ...temp, nbBarres: parseInt(e.target.value) })} />
+                        <select className="flex-1 p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.diametre} onChange={e => setTemp({ ...temp, diametre: parseInt(e.target.value) })}>
+                            {[8, 10, 12, 14, 16].map(d => <option key={d} value={d}>Barres Φ {d}</option>)}
+                        </select>
+                    </div>
+                </div>
+                <div className="col-span-2">
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Planche de Coffrage</label>
+                    <select className="w-full p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.boardId} onChange={e => setTemp({ ...temp, boardId: e.target.value })}>
+                        {BOARD_TYPES.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
+                    </select>
+                </div>
+            </div>
+            <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER POTEAU</button>
+        </div>
+    );
+};
+
+const AddPoutre = ({ onAdd }) => {
+    const [temp, setTemp] = useState({ longueur: 4, sectionL: 0.2, sectionH: 0.3, diametre: 12, espacementCadre: 0.20, diametreCadre: 6, boardId: 'p4_20' });
+    return (
+        <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
+            <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
+                <Grid size={16} className="text-blue-600" /> Poutre / Chaînage
+            </h3>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Longueur (m)</label>
+                    <input type="number" placeholder="L (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, longueur: parseFloat(e.target.value) || 0 })} />
+                </div>
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Aciers</label>
+                    <select className="w-full p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.diametre} onChange={e => setTemp({ ...temp, diametre: parseInt(e.target.value) })}>
+                        {[8, 10, 12, 14, 16].map(d => <option key={d} value={d}>Φ {d}mm</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Largeur (m)</label>
+                    <input type="number" placeholder="l (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, sectionL: parseFloat(e.target.value) || 0 })} />
+                </div>
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Hauteur (m)</label>
+                    <input type="number" placeholder="h (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, sectionH: parseFloat(e.target.value) || 0 })} />
+                </div>
+                <div className="col-span-2">
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Planche de Coffrage</label>
+                    <select className="w-full p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.boardId} onChange={e => setTemp({ ...temp, boardId: e.target.value })}>
+                        {BOARD_TYPES.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
+                    </select>
+                </div>
+            </div>
+            <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER POUTRE</button>
+        </div>
+    );
+};
+
+const AddMur = ({ onAdd, brickWaste, onUpdateWaste }) => {
+    const [temp, setTemp] = useState({ longueur: 0, hauteur: 0, ouvertures: 0, briqueId: 'b15' });
+
+    return (
+        <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
+            <div className="flex justify-between items-center mb-3">
+                <h3 className="font-bold text-gray-700 flex items-center gap-2 text-sm uppercase">
+                    <Square size={16} className="text-red-600" /> Mur en Briques
+                </h3>
+                <div className="flex items-center gap-1 bg-red-50 px-2 py-1 rounded text-[10px]">
+                    <span className="text-red-600 font-bold">Perte:</span>
+                    <input
+                        type="number"
+                        className="w-8 bg-transparent border-b border-red-200 text-center font-bold text-red-700 focus:outline-none"
+                        value={brickWaste !== undefined ? brickWaste : 5}
+                        onChange={(e) => onUpdateWaste && onUpdateWaste(e.target.value)}
+                    />
+                    <span className="text-red-600">%</span>
+                </div>
+            </div>
+
+            <div className="flex gap-1 mb-3 overflow-x-auto pb-1">
+                {BRICK_TYPES.map((b) => (
+                    <button key={b.id} onClick={() => setTemp({ ...temp, briqueId: b.id })} className={`whitespace-nowrap px-3 py-1.5 rounded-full border text-[10px] font-black transition-all ${temp.briqueId === b.id ? 'bg-red-600 border-red-600 text-white shadow-sm' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>{b.label}</button>
+                ))}
+            </div>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">L (m)</label>
+                    <input type="number" placeholder="L (m)" className="w-full p-2 bg-gray-50 border rounded text-xs outline-red-500" onChange={e => setTemp({ ...temp, longueur: parseFloat(e.target.value) || 0 })} />
+                </div>
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">H (m)</label>
+                    <input type="number" placeholder="H (m)" className="w-full p-2 bg-gray-50 border rounded text-xs outline-red-500" onChange={e => setTemp({ ...temp, hauteur: parseFloat(e.target.value) || 0 })} />
+                </div>
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Vides (m²)</label>
+                    <input type="number" placeholder="Vides (m²)" className="w-full p-2 bg-gray-50 border rounded text-xs outline-red-500" onChange={e => setTemp({ ...temp, ouvertures: parseFloat(e.target.value) || 0 })} />
+                </div>
+            </div>
+            <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-red-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER MUR</button>
+        </div>
+    );
+};
+
+const AddDalle = ({ onAdd }) => {
+    const [temp, setTemp] = useState({ longueur: 4, largeur: 4, epaisseur: 0.15, diametre: 10, maille: 0.20, boardId: 'p4_20', espacementEtaiement: 0.60 });
+    return (
+        <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
+            <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
+                <Layout size={16} className="text-purple-600" /> Dalle Béton
+            </h3>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-gray-400 font-bold uppercase">Dimensions (m)</label>
+                    <div className="grid grid-cols-2 gap-1">
+                        <div>
+                            <label className="text-[8px] text-gray-400 font-bold uppercase block">L (m)</label>
+                            <input type="number" placeholder="L (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, longueur: parseFloat(e.target.value) || 0 })} />
+                        </div>
+                        <div>
+                            <label className="text-[8px] text-gray-400 font-bold uppercase block">l (m)</label>
+                            <input type="number" placeholder="l (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, largeur: parseFloat(e.target.value) || 0 })} />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-[8px] text-gray-400 font-bold uppercase block">Épaisseur (m)</label>
+                        <input type="number" step="0.01" placeholder="Epaisseur (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, epaisseur: parseFloat(e.target.value) || 0 })} />
+                    </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-gray-400 font-bold uppercase">Ferraillage</label>
+                    <div>
+                        <label className="text-[8px] text-gray-400 font-bold uppercase block">Diamètre</label>
+                        <select className="w-full p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.diametre} onChange={e => setTemp({ ...temp, diametre: parseInt(e.target.value) })}>
+                            {[8, 10, 12, 14].map(d => <option key={d} value={d}>Φ {d}mm</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-[8px] text-gray-400 font-bold uppercase block">Maille</label>
+                        <select className="w-full p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.maille} onChange={e => setTemp({ ...temp, maille: parseFloat(e.target.value) })}>
+                            <option value="0.15">Maille 15x15</option>
+                            <option value="0.20">Maille 20x20</option>
+                            <option value="0.25">Maille 25x25</option>
+                            <option value="0.30">Maille 30x30</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-[8px] text-gray-400 font-bold uppercase block">Coffrage</label>
+                        <select className="w-full p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.boardId} onChange={e => setTemp({ ...temp, boardId: e.target.value })}>
+                            {BOARD_TYPES.map(b => (
+                                <option key={b.id} value={b.id}>{b.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-[8px] text-gray-400 font-bold uppercase block">Espacement Étais (m)</label>
+                        <input type="number" step="0.05" placeholder="Esp. Étai (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.espacementEtaiement} onChange={e => setTemp({ ...temp, espacementEtaiement: parseFloat(e.target.value) || 0 })} />
+                    </div>
+                </div>
+            </div>
+            <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-purple-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER DALLE</button>
+        </div>
+    );
+};
+
+const AddToiture = ({ onAdd }) => {
+    const [temp, setTemp] = useState({ surfaceAuSol: 0, penteDeg: 15 });
+    return (
+        <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
+            <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
+                <RoofIcon size={16} className="text-cyan-600" /> Calcul de Toiture
+            </h3>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-gray-400 font-bold uppercase">Surface au sol (m²)</label>
+                    <input type="number" placeholder="Ex: 100" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, surfaceAuSol: parseFloat(e.target.value) || 0 })} />
+                </div>
+                <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-gray-400 font-bold uppercase">Pente (Degrés)</label>
+                    <input type="number" placeholder="Ex: 15" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.penteDeg} onChange={e => setTemp({ ...temp, penteDeg: parseFloat(e.target.value) || 0 })} />
+                </div>
+            </div>
+            <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-cyan-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> DÉFINIR LA TOITURE</button>
+        </div>
+    );
+};
+
+const AddCarrelage = ({ onAdd }) => {
+    const [temp, setTemp] = useState({ longueur: 4, largeur: 4, tileId: 't60' });
+    return (
+        <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
+            <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
+                <Grid size={16} className="text-emerald-600" /> Carrelage
+            </h3>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-gray-400 font-bold uppercase">Dimensions Pièce</label>
+                    <div className="grid grid-cols-2 gap-1">
+                        <div>
+                            <label className="text-[8px] text-gray-400 font-bold uppercase block">Longueur (m)</label>
+                            <input type="number" placeholder="L (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, longueur: parseFloat(e.target.value) || 0 })} />
+                        </div>
+                        <div>
+                            <label className="text-[8px] text-gray-400 font-bold uppercase block">l (m)</label>
+                            <input type="number" placeholder="l (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, largeur: parseFloat(e.target.value) || 0 })} />
+                        </div>
+                    </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-gray-400 font-bold uppercase">Type de Carreau</label>
+                    <select className="w-full p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.tileId} onChange={e => setTemp({ ...temp, tileId: e.target.value })}>
+                        {TILE_TYPES.map(t => (
+                            <option key={t.id} value={t.id}>{t.label}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+            <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-emerald-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER PIÈCE</button>
+        </div>
+    );
+};
+
+const AddEscalier = ({ onAdd }) => {
+    const [temp, setTemp] = useState({ volume: 1, dosage: 350 });
+    return (
+        <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
+            <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
+                <TrendingUp size={16} className="text-gray-600" /> Escalier (Volume)
+            </h3>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Volume (m³)</label>
+                    <input type="number" placeholder="m³" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.volume} onChange={e => setTemp({ ...temp, volume: parseFloat(e.target.value) || 0 })} />
+                </div>
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Dosage Ciment</label>
+                    <input type="number" placeholder="kg/m³" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.dosage} onChange={e => setTemp({ ...temp, dosage: parseInt(e.target.value) || 350 })} />
+                </div>
+            </div>
+            <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-gray-800 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER ESCALIER</button>
+        </div>
+    );
+};
+
+const AddDivers = ({ onAdd }) => {
+    const [temp, setTemp] = useState({ quantity: 1, longueur: 1, largeur: 1, epaisseur: 0.1, dosage: 350, isReinforced: false, steelRatio: 80 });
+    return (
+        <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
+            <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
+                <Layers size={16} className="text-pink-600" /> Divers / Autre Béton
+            </h3>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Quantité</label>
+                    <input type="number" placeholder="1" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.quantity} onChange={e => setTemp({ ...temp, quantity: parseInt(e.target.value) || 1 })} />
+                </div>
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Dosage (kg/m³)</label>
+                    <input type="number" placeholder="350" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.dosage} onChange={e => setTemp({ ...temp, dosage: parseInt(e.target.value) || 350 })} />
+                </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">L (m)</label>
+                    <input type="number" placeholder="L" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.longueur} onChange={e => setTemp({ ...temp, longueur: parseFloat(e.target.value) || 0 })} />
+                </div>
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">l (m)</label>
+                    <input type="number" placeholder="l" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.largeur} onChange={e => setTemp({ ...temp, largeur: parseFloat(e.target.value) || 0 })} />
+                </div>
+                <div>
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Ep (m)</label>
+                    <input type="number" placeholder="Ep" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.epaisseur} onChange={e => setTemp({ ...temp, epaisseur: parseFloat(e.target.value) || 0 })} />
+                </div>
+            </div>
+
+            <div className="bg-gray-50 p-2 rounded mb-3">
+                <div className="flex items-center gap-2">
+                    <input type="checkbox" className="w-4 h-4" checked={temp.isReinforced} onChange={e => setTemp(prev => ({ ...prev, isReinforced: e.target.checked }))} />
+                    <span className="text-[10px] uppercase font-bold text-gray-600">Armé ?</span>
+                </div>
+                {temp.isReinforced && (
+                    <div className="mt-2 animate-in fade-in slide-in-from-top-1">
+                        <label className="text-[8px] text-gray-400 font-bold uppercase block">Ratio Acier (kg/m³)</label>
+                        <input type="number" placeholder="80" className="w-full p-2 bg-white border rounded text-xs" value={temp.steelRatio} onChange={e => setTemp({ ...temp, steelRatio: parseFloat(e.target.value) || 0 })} />
+                    </div>
+                )}
+            </div>
+
+            <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-pink-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER ÉLÉMENT</button>
+        </div>
+    );
+};
+
+const DetailedMaterialSummary = ({ totals }) => {
+    if (!totals || !totals.categories) return null;
+
+    const catNames = {
+        semelles: 'Fondations',
+        poteaux: 'Poteaux',
+        poutres: 'Poutres / Chaînages',
+        murs: 'Élévation / Murs',
+        dalles: 'Dalles Béton',
+        toiture: 'Toiture',
+        carrelage: 'Carrelage',
+        escaliers: 'Escaliers Béton',
+        divers: 'Divers Travaux'
+    };
+
+    const formatMaterial = (catKey, data) => {
+        const parts = [];
+        if (data.ciment > 0) parts.push(`${Math.ceil(data.ciment / 50)} sacs ciment`);
+        if (data.briques > 0) parts.push(`${Math.ceil(data.briques)} briques`);
+        if (data.sable > 0) parts.push(`${data.sable.toFixed(2)}m³ sable`);
+        if (data.gravier > 0) parts.push(`${data.gravier.toFixed(2)}m³ gravier`);
+        if (data.toles > 0) parts.push(`${data.toles} tôles`);
+        if (data.carreaux > 0) parts.push(`${data.carreaux} carreaux`);
+        if (data.coffrage > 0) parts.push(`${data.coffrage.toFixed(1)}m² coffrage`);
+        if (data.chevrons > 0) parts.push(`${data.chevrons} chevrons`);
+
+        if (data.acier) {
+            Object.entries(data.acier).forEach(([diam, kg]) => {
+                if (kg > 0) {
+                    const weightPerBar = 12 * (STEEL_WEIGHTS[diam] || 1);
+                    const nbBars = Math.ceil(kg / weightPerBar);
+                    parts.push(`${nbBars} barres Φ${diam}`);
+                }
+            });
+        }
+
+        return parts.length > 0 ? parts.join(', ') : null;
+    };
+
+    const activeCats = Object.entries(totals.categories).filter(([k, v]) => {
+        return formatMaterial(k, v) !== null;
+    });
+
+    if (activeCats.length === 0) return null;
+
+    return (
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6 space-y-4 animate-in slide-in-from-right duration-300">
+            <div className="flex items-center gap-3 border-b border-gray-50 pb-3">
+                <div className="bg-blue-600 p-2 rounded-lg text-white">
+                    <List size={18} />
+                </div>
+                <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight">Résumé par Élément</h3>
+            </div>
+            <div className="space-y-3">
+                {activeCats.map(([key, data]) => {
+                    const materialString = formatMaterial(key, data);
+                    return (
+                        <div key={key} className="flex flex-col gap-1 p-3 rounded-xl bg-gray-50 border border-gray-100">
+                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{catNames[key] || key}</span>
+                            <p className="text-xs font-bold text-gray-700 leading-relaxed capitalize">
+                                {materialString}
+                            </p>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+const ResultsSummary = ({ totals }) => {
+    const t = totals.global || totals;
+    return (
+        <div className="mb-6 animate-in slide-in-from-top-4 fade-in duration-500">
+            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Résultats Global (Tout Inclus)</h3>
+            <div className="grid grid-cols-2 gap-3">
+                <StatCard title="Ciment" value={t.ciment} unit="Sacs" color="bg-blue-600" />
+                <StatCard title="Briques" value={t.briques} unit="Unités" color="bg-red-600" />
+                <StatCard title="Sable" value={t.sable} unit="m³" color="bg-amber-500" />
+                <StatCard title="Gravier" value={t.gravier} unit="m³" color="bg-zinc-500" />
+            </div>
+        </div>
+    );
+};
+
+
 const App = () => {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [project, setProject] = useState({
@@ -887,369 +1324,8 @@ const App = () => {
         setTotals(calculateProjectTotals(project));
     }, [project]);
 
-    // --- COMPOSANTS DE SAISIE ---
-    const AddSemelle = ({ onAdd }) => {
-        const [temp, setTemp] = useState({ longueur: 1, largeur: 1, epaisseur: 0.3, diametre: 12 });
-        return (
-            <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
-                <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
-                    <Layers size={16} className="text-blue-600" /> Semelle Isolée
-                </h3>
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Longueur (m)</label>
-                        <input type="number" placeholder="L (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, longueur: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Largeur (m)</label>
-                        <input type="number" placeholder="l (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, largeur: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Épaisseur (m)</label>
-                        <input type="number" placeholder="Ep (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, epaisseur: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Aciers</label>
-                        <select className="w-full p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.diametre} onChange={e => setTemp({ ...temp, diametre: parseInt(e.target.value) })}>
-                            {[8, 10, 12, 14].map(d => <option key={d} value={d}>Acier Φ {d}</option>)}
-                        </select>
-                    </div>
-                </div>
-                <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER SEMELLE</button>
-            </div>
-        );
-    };
 
-    const AddPoteau = ({ onAdd }) => {
-        const [temp, setTemp] = useState({ hauteur: 3, sectionL: 0.2, sectionl: 0.2, nbBarres: 4, diametre: 12, espacementCadre: 0.20, diametreCadre: 6, boardId: 'p4_20', quantity: 1 });
-        return (
-            <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
-                <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
-                    <Grid size={16} className="text-blue-600" /> Poteau
-                </h3>
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Quantité</label>
-                        <input type="number" placeholder="1" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.quantity} onChange={e => setTemp({ ...temp, quantity: parseInt(e.target.value) || 1 })} />
-                    </div>
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Hauteur (m)</label>
-                        <input type="number" placeholder="H (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.hauteur} onChange={e => setTemp({ ...temp, hauteur: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">L (m)</label>
-                        <input type="number" placeholder="L (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.sectionL} onChange={e => setTemp({ ...temp, sectionL: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">l (m)</label>
-                        <input type="number" placeholder="l (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.sectionl} onChange={e => setTemp({ ...temp, sectionl: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                    <div className="col-span-2">
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Aciers</label>
-                        <div className="flex gap-2">
-                            <input type="number" className="w-16 p-2 bg-gray-50 border rounded text-xs" value={temp.nbBarres} onChange={e => setTemp({ ...temp, nbBarres: parseInt(e.target.value) })} />
-                            <select className="flex-1 p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.diametre} onChange={e => setTemp({ ...temp, diametre: parseInt(e.target.value) })}>
-                                {[8, 10, 12, 14, 16].map(d => <option key={d} value={d}>Barres Φ {d}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                    <div className="col-span-2">
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Planche de Coffrage</label>
-                        <select className="w-full p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.boardId} onChange={e => setTemp({ ...temp, boardId: e.target.value })}>
-                            {BOARD_TYPES.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
-                        </select>
-                    </div>
-                </div>
-                <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER POTEAU</button>
-            </div>
-        );
-    };
-
-    const AddPoutre = ({ onAdd }) => {
-        const [temp, setTemp] = useState({ longueur: 4, sectionL: 0.2, sectionH: 0.3, diametre: 12, espacementCadre: 0.20, diametreCadre: 6, boardId: 'p4_20' });
-        return (
-            <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
-                <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
-                    <Grid size={16} className="text-blue-600" /> Poutre / Chaînage
-                </h3>
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Longueur (m)</label>
-                        <input type="number" placeholder="L (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, longueur: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Aciers</label>
-                        <select className="w-full p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.diametre} onChange={e => setTemp({ ...temp, diametre: parseInt(e.target.value) })}>
-                            {[8, 10, 12, 14, 16].map(d => <option key={d} value={d}>Φ {d}mm</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Largeur (m)</label>
-                        <input type="number" placeholder="l (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, sectionL: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Hauteur (m)</label>
-                        <input type="number" placeholder="h (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, sectionH: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                    <div className="col-span-2">
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Planche de Coffrage</label>
-                        <select className="w-full p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.boardId} onChange={e => setTemp({ ...temp, boardId: e.target.value })}>
-                            {BOARD_TYPES.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
-                        </select>
-                    </div>
-                </div>
-                <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER POUTRE</button>
-            </div>
-        );
-    };
-
-    const AddMur = ({ onAdd, brickWaste, onUpdateWaste }) => {
-        const [temp, setTemp] = useState({ longueur: 0, hauteur: 0, ouvertures: 0, briqueId: 'b15' });
-
-        return (
-            <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
-                <div className="flex justify-between items-center mb-3">
-                    <h3 className="font-bold text-gray-700 flex items-center gap-2 text-sm uppercase">
-                        <Square size={16} className="text-red-600" /> Mur en Briques
-                    </h3>
-                    <div className="flex items-center gap-1 bg-red-50 px-2 py-1 rounded text-[10px]">
-                        <span className="text-red-600 font-bold">Perte:</span>
-                        <input
-                            type="number"
-                            className="w-8 bg-transparent border-b border-red-200 text-center font-bold text-red-700 focus:outline-none"
-                            value={brickWaste !== undefined ? brickWaste : 5}
-                            onChange={(e) => onUpdateWaste && onUpdateWaste(e.target.value)}
-                        />
-                        <span className="text-red-600">%</span>
-                    </div>
-                </div>
-
-                <div className="flex gap-1 mb-3 overflow-x-auto pb-1">
-                    {BRICK_TYPES.map((b) => (
-                        <button key={b.id} onClick={() => setTemp({ ...temp, briqueId: b.id })} className={`whitespace-nowrap px-3 py-1.5 rounded-full border text-[10px] font-black transition-all ${temp.briqueId === b.id ? 'bg-red-600 border-red-600 text-white shadow-sm' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>{b.label}</button>
-                    ))}
-                </div>
-                <div className="grid grid-cols-3 gap-2 mb-3">
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">L (m)</label>
-                        <input type="number" placeholder="L (m)" className="w-full p-2 bg-gray-50 border rounded text-xs outline-red-500" onChange={e => setTemp({ ...temp, longueur: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">H (m)</label>
-                        <input type="number" placeholder="H (m)" className="w-full p-2 bg-gray-50 border rounded text-xs outline-red-500" onChange={e => setTemp({ ...temp, hauteur: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                    <div>
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Vides (m²)</label>
-                        <input type="number" placeholder="Vides (m²)" className="w-full p-2 bg-gray-50 border rounded text-xs outline-red-500" onChange={e => setTemp({ ...temp, ouvertures: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                </div>
-                <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-red-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER MUR</button>
-            </div>
-        );
-    };
-
-    const AddDalle = ({ onAdd }) => {
-        const [temp, setTemp] = useState({ longueur: 4, largeur: 4, epaisseur: 0.15, diametre: 10, maille: 0.20, boardId: 'p4_20', espacementEtaiement: 0.60 });
-        return (
-            <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
-                <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
-                    <Layout size={16} className="text-purple-600" /> Dalle Béton
-                </h3>
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[9px] text-gray-400 font-bold uppercase">Dimensions (m)</label>
-                        <div className="grid grid-cols-2 gap-1">
-                            <div>
-                                <label className="text-[8px] text-gray-400 font-bold uppercase block">L (m)</label>
-                                <input type="number" placeholder="L (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, longueur: parseFloat(e.target.value) || 0 })} />
-                            </div>
-                            <div>
-                                <label className="text-[8px] text-gray-400 font-bold uppercase block">l (m)</label>
-                                <input type="number" placeholder="l (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, largeur: parseFloat(e.target.value) || 0 })} />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="text-[8px] text-gray-400 font-bold uppercase block">Épaisseur (m)</label>
-                            <input type="number" step="0.01" placeholder="Epaisseur (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, epaisseur: parseFloat(e.target.value) || 0 })} />
-                        </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[9px] text-gray-400 font-bold uppercase">Ferraillage</label>
-                        <div>
-                            <label className="text-[8px] text-gray-400 font-bold uppercase block">Diamètre</label>
-                            <select className="w-full p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.diametre} onChange={e => setTemp({ ...temp, diametre: parseInt(e.target.value) })}>
-                                {[8, 10, 12, 14].map(d => <option key={d} value={d}>Φ {d}mm</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="text-[8px] text-gray-400 font-bold uppercase block">Maille</label>
-                            <select className="w-full p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.maille} onChange={e => setTemp({ ...temp, maille: parseFloat(e.target.value) })}>
-                                <option value="0.15">Maille 15x15</option>
-                                <option value="0.20">Maille 20x20</option>
-                                <option value="0.25">Maille 25x25</option>
-                                <option value="0.30">Maille 30x30</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="text-[8px] text-gray-400 font-bold uppercase block">Coffrage</label>
-                            <select className="w-full p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.boardId} onChange={e => setTemp({ ...temp, boardId: e.target.value })}>
-                                {BOARD_TYPES.map(b => (
-                                    <option key={b.id} value={b.id}>{b.label}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="text-[8px] text-gray-400 font-bold uppercase block">Espacement Étais (m)</label>
-                            <input type="number" step="0.05" placeholder="Esp. Étai (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.espacementEtaiement} onChange={e => setTemp({ ...temp, espacementEtaiement: parseFloat(e.target.value) || 0 })} />
-                        </div>
-                    </div>
-                </div>
-                <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-purple-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER DALLE</button>
-            </div>
-        );
-    };
-
-    const AddToiture = ({ onAdd }) => {
-        const [temp, setTemp] = useState({ surfaceAuSol: 0, penteDeg: 15 });
-        return (
-            <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
-                <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
-                    <RoofIcon size={16} className="text-cyan-600" /> Calcul de Toiture
-                </h3>
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[9px] text-gray-400 font-bold uppercase">Surface au sol (m²)</label>
-                        <input type="number" placeholder="Ex: 100" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, surfaceAuSol: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[9px] text-gray-400 font-bold uppercase">Pente (Degrés)</label>
-                        <input type="number" placeholder="Ex: 15" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.penteDeg} onChange={e => setTemp({ ...temp, penteDeg: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                </div>
-                <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-cyan-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> DÉFINIR LA TOITURE</button>
-            </div>
-        );
-    };
-
-    const AddCarrelage = ({ onAdd }) => {
-        const [temp, setTemp] = useState({ longueur: 4, largeur: 4, tileId: 't60' });
-        return (
-            <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
-                <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
-                    <Grid size={16} className="text-emerald-600" /> Carrelage
-                </h3>
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[9px] text-gray-400 font-bold uppercase">Dimensions Pièce</label>
-                        <div className="grid grid-cols-2 gap-1">
-                            <div>
-                                <label className="text-[8px] text-gray-400 font-bold uppercase block">Longueur (m)</label>
-                                <input type="number" placeholder="L (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, longueur: parseFloat(e.target.value) || 0 })} />
-                            </div>
-                            <div>
-                                <label className="text-[8px] text-gray-400 font-bold uppercase block">Largeur (m)</label>
-                                <input type="number" placeholder="l (m)" className="w-full p-2 bg-gray-50 border rounded text-xs" onChange={e => setTemp({ ...temp, largeur: parseFloat(e.target.value) || 0 })} />
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[9px] text-gray-400 font-bold uppercase">Type de Carreau</label>
-                        <select className="w-full p-2 bg-gray-50 border rounded text-xs font-bold" value={temp.tileId} onChange={e => setTemp({ ...temp, tileId: e.target.value })}>
-                            {TILE_TYPES.map(t => (
-                                <option key={t.id} value={t.id}>{t.label}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-                <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-emerald-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER PIÈCE</button>
-            </div>
-        );
-    };
-
-    const DetailedMaterialSummary = ({ totals }) => {
-        if (!totals || !totals.categories) return null;
-
-        const catNames = {
-            semelles: 'Fondations',
-            poteaux: 'Poteaux',
-            poutres: 'Poutres / Chaînages',
-            murs: 'Élévation / Murs',
-            dalles: 'Dalles Béton',
-            toiture: 'Toiture',
-            carrelage: 'Carrelage',
-            escaliers: 'Escaliers Béton',
-            divers: 'Divers Travaux'
-        };
-
-        const formatMaterial = (catKey, data) => {
-            const parts = [];
-            if (data.ciment > 0) parts.push(`${Math.ceil(data.ciment / 50)} sacs ciment`);
-            if (data.briques > 0) parts.push(`${Math.ceil(data.briques)} briques`);
-            if (data.sable > 0) parts.push(`${data.sable.toFixed(2)}m³ sable`);
-            if (data.gravier > 0) parts.push(`${data.gravier.toFixed(2)}m³ gravier`);
-            if (data.toles > 0) parts.push(`${data.toles} tôles`);
-            if (data.carreaux > 0) parts.push(`${data.carreaux} carreaux`);
-            if (data.coffrage > 0) parts.push(`${data.coffrage.toFixed(1)}m² coffrage`);
-            if (data.chevrons > 0) parts.push(`${data.chevrons} chevrons`);
-
-            if (data.acier) {
-                Object.entries(data.acier).forEach(([diam, kg]) => {
-                    if (kg > 0) {
-                        const weightPerBar = 12 * (STEEL_WEIGHTS[diam] || 1);
-                        const nbBars = Math.ceil(kg / weightPerBar);
-                        parts.push(`${nbBars} barres Φ${diam}`);
-                    }
-                });
-            }
-
-            return parts.length > 0 ? parts.join(', ') : null;
-        };
-
-        const activeCats = Object.entries(totals.categories).filter(([k, v]) => {
-            return formatMaterial(k, v) !== null;
-        });
-
-        if (activeCats.length === 0) return null;
-
-        return (
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6 space-y-4 animate-in slide-in-from-right duration-300">
-                <div className="flex items-center gap-3 border-b border-gray-50 pb-3">
-                    <div className="bg-blue-600 p-2 rounded-lg text-white">
-                        <List size={18} />
-                    </div>
-                    <h3 className="text-sm font-black text-gray-800 uppercase tracking-tight">Résumé par Élément</h3>
-                </div>
-                <div className="space-y-3">
-                    {activeCats.map(([key, data]) => {
-                        const materialString = formatMaterial(key, data);
-                        return (
-                            <div key={key} className="flex flex-col gap-1 p-3 rounded-xl bg-gray-50 border border-gray-100">
-                                <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{catNames[key] || key}</span>
-                                <p className="text-xs font-bold text-gray-700 leading-relaxed capitalize">
-                                    {materialString}
-                                </p>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        );
-    };
-
-    const ResultsSummary = ({ totals }) => {
-        const t = totals.global || totals;
-        return (
-            <div className="mb-6 animate-in slide-in-from-top-4 fade-in duration-500">
-                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Résultats Global (Tout Inclus)</h3>
-                <div className="grid grid-cols-2 gap-3">
-                    <StatCard title="Ciment" value={t.ciment} unit="Sacs" color="bg-blue-600" />
-                    <StatCard title="Briques" value={t.briques} unit="Unités" color="bg-red-600" />
-                    <StatCard title="Sable" value={t.sable} unit="m³" color="bg-amber-500" />
-                    <StatCard title="Gravier" value={t.gravier} unit="m³" color="bg-zinc-500" />
-                </div>
-            </div>
-        );
-    };
+    // --- QUICK CALC STATE (Independent from Project) ---
 
     const ProjectsView = () => {
         // Use parent's projectViewMode instead of local state
@@ -3686,77 +3762,7 @@ const App = () => {
 
 
 
-        const AddEscalier = ({ onAdd }) => {
-            const [temp, setTemp] = useState({ volume: 1, dosage: 350 });
-            return (
-                <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
-                    <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
-                        <TrendingUp size={16} className="text-gray-600" /> Escalier (Volume)
-                    </h3>
-                    <div className="grid grid-cols-2 gap-3 mb-3">
-                        <div>
-                            <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Volume (m³)</label>
-                            <input type="number" placeholder="m³" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.volume} onChange={e => setTemp({ ...temp, volume: parseFloat(e.target.value) || 0 })} />
-                        </div>
-                        <div>
-                            <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Dosage Ciment</label>
-                            <input type="number" placeholder="kg/m³" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.dosage} onChange={e => setTemp({ ...temp, dosage: parseInt(e.target.value) || 350 })} />
-                        </div>
-                    </div>
-                    <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-gray-800 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER ESCALIER</button>
-                </div>
-            );
-        };
 
-        const AddDivers = ({ onAdd }) => {
-            const [temp, setTemp] = useState({ quantity: 1, longueur: 1, largeur: 1, epaisseur: 0.1, dosage: 350, isReinforced: false, steelRatio: 80 });
-            return (
-                <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
-                    <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2 text-sm uppercase">
-                        <Layers size={16} className="text-pink-600" /> Divers / Autre Béton
-                    </h3>
-                    <div className="grid grid-cols-2 gap-2 mb-3">
-                        <div>
-                            <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Quantité</label>
-                            <input type="number" placeholder="1" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.quantity} onChange={e => setTemp({ ...temp, quantity: parseInt(e.target.value) || 1 })} />
-                        </div>
-                        <div>
-                            <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Dosage (kg/m³)</label>
-                            <input type="number" placeholder="350" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.dosage} onChange={e => setTemp({ ...temp, dosage: parseInt(e.target.value) || 350 })} />
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 mb-3">
-                        <div>
-                            <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">L (m)</label>
-                            <input type="number" placeholder="L" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.longueur} onChange={e => setTemp({ ...temp, longueur: parseFloat(e.target.value) || 0 })} />
-                        </div>
-                        <div>
-                            <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">l (m)</label>
-                            <input type="number" placeholder="l" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.largeur} onChange={e => setTemp({ ...temp, largeur: parseFloat(e.target.value) || 0 })} />
-                        </div>
-                        <div>
-                            <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">Ep (m)</label>
-                            <input type="number" placeholder="Ep" className="w-full p-2 bg-gray-50 border rounded text-xs" value={temp.epaisseur} onChange={e => setTemp({ ...temp, epaisseur: parseFloat(e.target.value) || 0 })} />
-                        </div>
-                    </div>
-
-                    <div className="bg-gray-50 p-2 rounded mb-3">
-                        <div className="flex items-center gap-2">
-                            <input type="checkbox" className="w-4 h-4" checked={temp.isReinforced} onChange={e => setTemp(prev => ({ ...prev, isReinforced: e.target.checked }))} />
-                            <span className="text-[10px] uppercase font-bold text-gray-600">Armé ?</span>
-                        </div>
-                        {temp.isReinforced && (
-                            <div className="mt-2 animate-in fade-in slide-in-from-top-1">
-                                <label className="text-[8px] text-gray-400 font-bold uppercase block">Ratio Acier (kg/m³)</label>
-                                <input type="number" placeholder="80" className="w-full p-2 bg-white border rounded text-xs" value={temp.steelRatio} onChange={e => setTemp({ ...temp, steelRatio: parseFloat(e.target.value) || 0 })} />
-                            </div>
-                        )}
-                    </div>
-
-                    <button onClick={() => onAdd && onAdd(temp)} className="w-full bg-pink-600 text-white py-2 rounded-lg font-bold text-xs flex justify-center items-center gap-2 active:scale-95 transition-transform"><Plus size={14} /> AJOUTER ÉLÉMENT</button>
-                </div>
-            );
-        };
 
         // --- PlanningView Main Render ---
         return (

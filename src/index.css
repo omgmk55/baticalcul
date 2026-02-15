@@ -1,12 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
-@layer utilities {
-    .no-print {
-        @apply print:hidden;
-    }
-}
+
 
 /* Print Styles for Professional Quote Export */
 @media print {
@@ -24,12 +17,13 @@
     }
 
     /* Hide everything by default */
-    body > * {
+    body>* {
         display: none;
     }
 
     /* Only display the printable area */
-    .printable-sheet, .printable-sheet * {
+    .printable-sheet,
+    .printable-sheet * {
         display: block;
     }
 
@@ -40,18 +34,27 @@
         left: 0;
         width: 100%;
         margin: 0;
-        padding: 20mm !important; /* Standard A4 padding */
+        padding: 20mm !important;
+        /* Standard A4 padding */
         border: none;
         box-shadow: none;
         max-width: none !important;
         background: white;
     }
-    
+
     /* Ensure grid/flex layouts work inside the printable area */
-    .printable-sheet .flex { display: flex; }
-    .printable-sheet .grid { display: grid; }
-    .printable-sheet .hidden { display: none; }
-    
+    .printable-sheet .flex {
+        display: flex;
+    }
+
+    .printable-sheet .grid {
+        display: grid;
+    }
+
+    .printable-sheet .hidden {
+        display: none;
+    }
+
     /* Hide specific UI elements inside the sheet if marked as no-print */
     .no-print {
         display: none !important;
@@ -62,7 +65,7 @@
 .printable-sheet {
     background: white;
     /* Aspect Ratio for A4 (210mm x 297mm) ~ 1 / 1.414 */
-    min-height: 29.7cm; 
+    min-height: 29.7cm;
     position: relative;
     /* Subtle paper texture or simple white */
 }
