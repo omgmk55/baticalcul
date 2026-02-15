@@ -23,16 +23,18 @@ CREATE TABLE IF NOT EXISTS public.messages (
 ALTER TABLE public.topics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 -- Policies for Topics
--- Everyone can read topics
-CREATE POLICY "Topics are viewable by everyone" ON public.topics FOR
+CREATE POLICY "Topics viewable by everyone" ON public.topics FOR
 SELECT USING (true);
--- Authenticated users can create topics (check against auth.uid())
 CREATE POLICY "Users can create topics" ON public.topics FOR
 INSERT WITH CHECK (auth.uid() = author_id);
+CREATE POLICY "Users can update their own topics" ON public.topics FOR
+UPDATE WITH CHECK (auth.uid() = author_id);
+CREATE POLICY "Users can delete their own topics" ON public.topics FOR DELETE USING (auth.uid() = author_id);
 -- Policies for Messages
--- Everyone can read messages
-CREATE POLICY "Messages are viewable by everyone" ON public.messages FOR
+CREATE POLICY "Messages viewable by everyone" ON public.messages FOR
 SELECT USING (true);
--- Authenticated users can create messages (check against auth.uid())
 CREATE POLICY "Users can create messages" ON public.messages FOR
 INSERT WITH CHECK (auth.uid() = author_id);
+CREATE POLICY "Users can update their own messages" ON public.messages FOR
+UPDATE WITH CHECK (auth.uid() = author_id);
+CREATE POLICY "Users can delete their own messages" ON public.messages FOR DELETE USING (auth.uid() = author_id);

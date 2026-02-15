@@ -1357,6 +1357,13 @@ const App = () => {
         const [newTopicCategory, setNewTopicCategory] = useState('Général');
         const [newTopicContent, setNewTopicContent] = useState('');
 
+        const [editingTopicId, setEditingTopicId] = useState(null);
+        const [editTopicTitle, setEditTopicTitle] = useState('');
+        const [editTopicCategory, setEditTopicCategory] = useState('');
+
+        const [editingMessageId, setEditingMessageId] = useState(null);
+        const [editMessageContent, setEditMessageContent] = useState('');
+
         const categories = ['All', 'Général', 'Chantier', 'Prix', 'Artisans', 'SOS'];
 
         useEffect(() => {
@@ -1387,6 +1394,7 @@ const App = () => {
                         id: t.id,
                         title: t.title,
                         author: t.author?.username || 'Anonyme',
+                        author_id: t.author?.id,
                         category: t.category,
                         date: new Date(t.created_at).toLocaleDateString('fr-FR'),
                         likes: 0,
@@ -1400,6 +1408,63 @@ const App = () => {
                 console.error("Error fetching topics:", err);
             } finally {
                 setLoading(false);
+            }
+        };
+
+        const handleUpdateTopic = async (id) => {
+            try {
+                const { error } = await supabase
+                    .from('topics')
+                    .update({ title: editTopicTitle, category: editTopicCategory })
+                    .eq('id', id);
+                if (error) throw error;
+                setEditingTopicId(null);
+                fetchTopics();
+            } catch (err) {
+                console.error("Error updating topic:", err);
+            }
+        };
+
+        const handleDeleteTopic = async (id) => {
+            if (!confirm("Voulez-vous vraiment supprimer ce sujet et tous ses messages ?")) return;
+            try {
+                const { error } = await supabase
+                    .from('topics')
+                    .delete()
+                    .eq('id', id);
+                if (error) throw error;
+                setForumViewMode('list');
+                fetchTopics();
+            } catch (err) {
+                console.error("Error deleting topic:", err);
+            }
+        };
+
+        const handleUpdateMessage = async (id) => {
+            try {
+                const { error } = await supabase
+                    .from('messages')
+                    .update({ content: editMessageContent })
+                    .eq('id', id);
+                if (error) throw error;
+                setEditingMessageId(null);
+                fetchMessages(activeTopicId);
+            } catch (err) {
+                console.error("Error updating message:", err);
+            }
+        };
+
+        const handleDeleteMessage = async (id) => {
+            if (!confirm("Voulez-vous vraiment supprimer ce message ?")) return;
+            try {
+                const { error } = await supabase
+                    .from('messages')
+                    .delete()
+                    .eq('id', id);
+                if (error) throw error;
+                fetchMessages(activeTopicId);
+            } catch (err) {
+                console.error("Error deleting message:", err);
             }
         };
 
@@ -1465,6 +1530,7 @@ const App = () => {
                 setActiveMessages(data.map(m => ({
                     id: m.id,
                     author: m.author?.username || 'Anonyme',
+                    author_id: m.author_id,
                     text: m.content,
                     time: new Date(m.created_at).toLocaleString('fr-FR'),
                     isMe: false, // We can't easily check auth.uid in mapped response without session check, handled below
@@ -1517,8 +1583,10 @@ const App = () => {
             return (
                 <div className="p-4 pb-24 space-y-4 h-full">
                     <div className="flex items-center gap-2 border-b-2 border-pink-600 pb-2">
-                        <button onClick={() => setForumViewMode('list')} className="text-pink-600"><ChevronLeft size={24} /></button>
-                        <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Nouveau Sujet</h2>
+                        <button onClick={() => { setForumViewMode('list'); setEditingTopicId(null); }} className="text-pink-600"><ChevronLeft size={24} /></button>
+                        <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">
+                            {editingTopicId ? 'Modifier le Sujet' : 'Nouveau Sujet'}
+                        </h2>
                     </div>
 
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-pink-100 space-y-4">
@@ -1570,11 +1638,11 @@ const App = () => {
 
 
                         <button
-                            onClick={handleCreateTopic}
+                            onClick={editingTopicId ? () => handleUpdateTopic(editingTopicId) : handleCreateTopic}
                             disabled={!newTopicTitle.trim() || !newTopicContent.trim()}
                             className="w-full bg-pink-600 text-white p-4 rounded-xl font-bold uppercase tracking-wide shadow-lg shadow-pink-200 hover:bg-pink-700 active:scale-95 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed"
                         >
-                            Publier la discussion
+                            {editingTopicId ? 'Enregistrer les modifications' : 'Publier la discussion'}
                         </button>
                     </div>
                 </div>
@@ -1593,7 +1661,29 @@ const App = () => {
                                 <p className="text-[10px] text-gray-500 font-bold">{activeTopic.category}</p>
                             </div>
                         </div>
-                        {/* Remove redundant login link since actions trigger it now */}
+                        {activeTopic.author_id === currentUser?.id && (
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => {
+                                        setEditingTopicId(activeTopic.id);
+                                        setEditTopicTitle(activeTopic.title);
+                                        setEditTopicCategory(activeTopic.category);
+                                        setForumViewMode('create');
+                                    }}
+                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    title="Modifier le titre"
+                                >
+                                    <Edit2 size={16} />
+                                </button>
+                                <button
+                                    onClick={() => handleDeleteTopic(activeTopic.id)}
+                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    title="Supprimer le sujet"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-hide">
@@ -1606,15 +1696,43 @@ const App = () => {
                         {activeTopic.messages.map(msg => (
                             <div key={msg.id} className={`flex flex-col ${msg.isMe ? 'items-end' : 'items-start'}`}>
                                 <div className={`p-3 rounded-xl border shadow-sm max-w-[85%] ${msg.isMe ? 'bg-blue-50 border-blue-100 rounded-tr-none' : 'bg-white border-gray-100 rounded-tl-none ml-2'}`}>
-                                    {!msg.isMe && (
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${msg.color} border border-white shadow-sm`}>{msg.avatar}</div>
-                                            <span className="text-[10px] font-bold text-gray-900">{msg.author}</span>
-                                        </div>
+                                    <div className="flex justify-between items-start gap-4 mb-1">
+                                        {!msg.isMe ? (
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${msg.color} border border-white shadow-sm`}>{msg.avatar}</div>
+                                                <span className="text-[10px] font-bold text-gray-900">{msg.author}</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex gap-1 ml-auto">
+                                                {editingMessageId === msg.id ? (
+                                                    <>
+                                                        <button onClick={() => handleUpdateMessage(msg.id)} className="text-green-600 hover:text-green-700 p-0.5"><Save size={14} /></button>
+                                                        <button onClick={() => setEditingMessageId(null)} className="text-red-600 hover:text-red-700 p-0.5"><X size={14} /></button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <button onClick={() => { setEditingMessageId(msg.id); setEditMessageContent(msg.text); }} className="text-blue-400 hover:text-blue-600 p-0.5"><Edit2 size={12} /></button>
+                                                        <button onClick={() => handleDeleteMessage(msg.id)} className="text-red-300 hover:text-red-500 p-0.5"><Trash2 size={12} /></button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {editingMessageId === msg.id ? (
+                                        <textarea
+                                            className="w-full bg-white border border-blue-200 rounded-lg p-2 text-[11px] focus:outline-none focus:border-blue-500"
+                                            value={editMessageContent}
+                                            onChange={e => setEditMessageContent(e.target.value)}
+                                            rows={3}
+                                            autoFocus
+                                        />
+                                    ) : (
+                                        <p className={`text-[11px] font-medium leading-relaxed ${msg.isMe ? 'text-blue-900' : 'text-gray-600'}`}>
+                                            {msg.text}
+                                        </p>
                                     )}
-                                    <p className={`text-[11px] font-medium leading-relaxed ${msg.isMe ? 'text-blue-900' : 'text-gray-600'}`}>
-                                        {msg.text}
-                                    </p>
+
                                     <div className={`mt-1 text-[9px] font-bold uppercase ${msg.isMe ? 'text-blue-400 text-right' : 'text-gray-400'}`}>
                                         <span>{msg.time}</span>
                                     </div>
@@ -1738,8 +1856,32 @@ const App = () => {
                                             {topic.author}
                                         </div>
                                         <div className="flex items-center gap-3 text-gray-400 text-xs font-bold">
+                                            {topic.author_id === currentUser?.id && (
+                                                <div className="flex gap-2 mr-2 border-r border-gray-100 pr-2">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingTopicId(topic.id);
+                                                            setEditTopicTitle(topic.title);
+                                                            setEditTopicCategory(topic.category);
+                                                            setForumViewMode('create');
+                                                        }}
+                                                        className="hover:text-blue-600 p-1"
+                                                    >
+                                                        <Edit2 size={14} />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteTopic(topic.id);
+                                                        }}
+                                                        className="hover:text-red-600 p-1"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            )}
                                             <span className="flex items-center gap-1"><MessageSquare size={14} /> {topic.replies}</span>
-                                            {/* <span className="flex items-center gap-1"><Heart size={14} /> {topic.likes}</span> */}
                                         </div>
                                     </div>
                                 </div>
