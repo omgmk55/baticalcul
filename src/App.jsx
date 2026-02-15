@@ -1445,34 +1445,18 @@ const App = () => {
                 .order('created_at', { ascending: true });
 
             if (!error && data) {
-                const myId = (await supabase.auth.getUser()).data.user?.id;
                 setActiveMessages(data.map(m => ({
                     id: m.id,
                     author: m.author?.username || 'Anonyme',
                     author_id: m.author_id,
                     text: m.content,
                     time: new Date(m.created_at).toLocaleString('fr-FR'),
-                    isMe: false, // We can't easily check auth.uid in mapped response without session check, handled below
-                    // color logic simplified
-                    color: 'bg-gray-100 text-gray-600',
+                    isMe: m.author_id === currentUser?.id,
+                    color: m.author_id === currentUser?.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600',
                     avatar: (m.author?.username || 'A').charAt(0).toUpperCase()
                 })));
-
-                // Post-process for isMe
-                checkIsMe(data);
             }
         };
-
-        const checkIsMe = async (messages) => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                setActiveMessages(prev => prev.map((m, i) => ({
-                    ...m,
-                    isMe: messages[i].author_id === user.id,
-                    color: messages[i].author_id === user.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
-                })));
-            }
-        }
 
         const handlePostMessage = async () => {
             if (!currentUser) return setShowAuthModal(true);
@@ -1577,7 +1561,11 @@ const App = () => {
                             <button onClick={() => setForumViewMode('list')} className="text-pink-600 shrink-0"><ChevronLeft size={24} /></button>
                             <div>
                                 <h2 className="text-sm font-black text-gray-900 uppercase tracking-tight truncate max-w-[200px]">{activeTopic.title}</h2>
-                                <p className="text-[10px] text-gray-500 font-bold">{activeTopic.category}</p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="text-[10px] text-gray-500 font-bold">{activeTopic.category}</span>
+                                    <span className="text-[8px] text-gray-300">•</span>
+                                    <span className="text-[10px] text-pink-600 font-bold">Par {activeTopic.author}</span>
+                                </div>
                             </div>
                         </div>
                         {activeTopic.author_id === currentUser?.id && (
@@ -1617,26 +1605,26 @@ const App = () => {
                             <div key={msg.id} className={`flex flex-col ${msg.isMe ? 'items-end' : 'items-start'}`}>
                                 <div className={`p-3 rounded-xl border shadow-sm max-w-[85%] ${msg.isMe ? 'bg-blue-50 border-blue-100 rounded-tr-none' : 'bg-white border-gray-100 rounded-tl-none ml-2'}`}>
                                     <div className="flex justify-between items-start gap-4 mb-1">
-                                        {!msg.isMe ? (
-                                            <div className="flex items-center gap-2">
-                                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${msg.color} border border-white shadow-sm`}>{msg.avatar}</div>
-                                                <span className="text-[10px] font-bold text-gray-900">{msg.author}</span>
-                                            </div>
-                                        ) : (
-                                            <div className="flex gap-1 ml-auto">
-                                                {editingMessageId === msg.id ? (
-                                                    <>
-                                                        <button onClick={() => handleUpdateMessage(msg.id)} className="text-green-600 hover:text-green-700 p-0.5"><Save size={14} /></button>
-                                                        <button onClick={() => setEditingMessageId(null)} className="text-red-600 hover:text-red-700 p-0.5"><X size={14} /></button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <button onClick={() => { setEditingMessageId(msg.id); setEditMessageContent(msg.text); }} className="text-blue-400 hover:text-blue-600 p-0.5"><Edit2 size={12} /></button>
-                                                        <button onClick={() => handleDeleteMessage(msg.id)} className="text-red-300 hover:text-red-500 p-0.5"><Trash2 size={12} /></button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        )}
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${msg.color} border border-white shadow-sm`}>{msg.avatar}</div>
+                                            <span className="text-[10px] font-bold text-gray-900">{msg.author}</span>
+
+                                            {msg.isMe && (
+                                                <div className="flex gap-1 ml-auto">
+                                                    {editingMessageId === msg.id ? (
+                                                        <>
+                                                            <button onClick={() => handleUpdateMessage(msg.id)} className="text-green-600 hover:text-green-700 p-0.5"><Save size={14} /></button>
+                                                            <button onClick={() => setEditingMessageId(null)} className="text-red-600 hover:text-red-700 p-0.5"><X size={14} /></button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button onClick={() => { setEditingMessageId(msg.id); setEditMessageContent(msg.text); }} className="text-blue-400 hover:text-blue-600 p-0.5"><Edit2 size={12} /></button>
+                                                            <button onClick={() => handleDeleteMessage(msg.id)} className="text-red-300 hover:text-red-500 p-0.5"><Trash2 size={12} /></button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {editingMessageId === msg.id ? (
