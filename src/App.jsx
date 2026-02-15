@@ -260,16 +260,13 @@ const App = () => {
         setProjectType('Maison');
         setProjectFloors(1);
         setProjectRooms(1);
-        alert(`Projet "${projectName}" sauvegardé !`);
     };
 
     const handleLoadProject = (projectToLoad) => {
         if (!projectToLoad.projectData) {
-            alert('Ce projet n\'a pas de données sauvegardées');
             return;
         }
         setProject(projectToLoad.projectData);
-        alert(`Projet "${projectToLoad.name}" chargé !`);
     };
 
     const handleDeleteProject = (projectId) => {
@@ -2349,14 +2346,12 @@ const App = () => {
         };
 
         const handleLoadQuote = (quote) => {
-            if (confirm(`Charger le devis "${quote.name}" ? Cela remplacera le devis actuel.`)) {
-                setClientInfo(quote.clientInfo);
-                setCompanyInfo(quote.companyInfo || companyInfo);
-                setItems(quote.items);
-                setQuoteType(quote.quoteType || 'dqe');
-                setShowLoadModal(false);
-                setViewMode('editor');
-            }
+            setClientInfo(quote.clientInfo);
+            setCompanyInfo(quote.companyInfo || companyInfo);
+            setItems(quote.items);
+            setQuoteType(quote.quoteType || 'dqe');
+            setShowLoadModal(false);
+            setViewMode('editor');
         };
 
         const handleDeleteQuote = (id, e) => {
