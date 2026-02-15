@@ -3567,16 +3567,18 @@ const App = () => {
                             <Settings2 size={18} className="text-gray-600" />
                             <span className="text-sm font-bold text-gray-700">Paramètres</span>
                         </button>
-                        <button
-                            onClick={() => {
-                                setShowProfileMenu(false);
-                                setActiveTab('admin');
-                            }}
-                            className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-purple-50 transition-colors text-left"
-                        >
-                            <Shield size={18} className="text-purple-600" />
-                            <span className="text-sm font-bold text-gray-700">Tableau de Bord Admin</span>
-                        </button>
+                        {currentUser?.email === ADMIN_EMAIL && (
+                            <button
+                                onClick={() => {
+                                    setShowProfileMenu(false);
+                                    setActiveTab('admin');
+                                }}
+                                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-purple-50 transition-colors text-left"
+                            >
+                                <Shield size={18} className="text-purple-600" />
+                                <span className="text-sm font-bold text-gray-700">Tableau de Bord Admin</span>
+                            </button>
+                        )}
                         <button
                             onClick={() => {
                                 setShowProfileMenu(false);
@@ -3609,7 +3611,7 @@ const App = () => {
             {activeTab === 'projects' && <div className="pt-2"><ProjectsView /></div>}
             {activeTab === 'devis' && <div className="pt-2"><DevisDQE /></div>}
             {activeTab === 'planning' && <div className="pt-2"><PlanningView /></div>}
-            {activeTab === 'admin' && <div className="pt-2"><AdminView /></div>}
+            {activeTab === 'admin' && currentUser?.email === ADMIN_EMAIL && <div className="pt-2"><AdminView /></div>}
             {activeTab === 'forum' && <div className="pt-2"><ForumView /></div>}
             {activeTab === 'plus' && <div className="pt-2"><PlusView /></div>}
 
