@@ -175,6 +175,8 @@ const App = () => {
     const [projectType, setProjectType] = useState('Maison');
     const [projectFloors, setProjectFloors] = useState(1);
     const [projectRooms, setProjectRooms] = useState(1);
+    const [projectDescription, setProjectDescription] = useState('');
+    const [projectDateTime, setProjectDateTime] = useState('');
 
     // UI State
     const [plusViewMode, setPlusViewMode] = useState('menu'); // 'menu' | 'about' | 'settings' | 'legal' | 'help' | 'profile'
@@ -246,26 +248,38 @@ const App = () => {
         const newProject = {
             id: Date.now(),
             name: projectName,
+            description: projectDescription,
             type: projectType,
             floors: projectFloors,
             rooms: projectRooms,
-            date: new Date().toLocaleDateString('fr-FR'),
+            date: projectDateTime || new Date().toLocaleString('fr-FR'),
             totalMat: `${totals.ciment} Sacs`,
+            activeForms: activeConstructionForms,
             projectData: { ...project },
             totals: { ...totals }
         };
 
         setSavedProjects([newProject, ...savedProjects]);
         setProjectName('');
+        setProjectDescription('');
+        setProjectDateTime('');
         setProjectType('Maison');
         setProjectFloors(1);
         setProjectRooms(1);
+        setActiveConstructionForms([]);
     };
 
     const handleLoadProject = (projectToLoad) => {
         if (!projectToLoad.projectData) {
             return;
         }
+        setProjectName(projectToLoad.name || '');
+        setProjectDescription(projectToLoad.description || '');
+        setProjectDateTime(projectToLoad.date || '');
+        setProjectType(projectToLoad.type || 'Maison');
+        setProjectFloors(projectToLoad.floors || 1);
+        setProjectRooms(projectToLoad.rooms || 1);
+        setActiveConstructionForms(projectToLoad.activeForms || []);
         setProject(projectToLoad.projectData);
     };
 
@@ -824,12 +838,14 @@ const App = () => {
                 nbCarreaux: 0
             });
             setProjectName('');
+            setProjectDescription('');
+            setProjectDateTime(new Date().toLocaleString('fr-FR').replace(',', ' à'));
             setProjectType('Maison');
             setProjectFloors(1);
             setProjectRooms(1);
             setActiveConstructionForms([]);
 
-            setViewMode('editor');
+            setViewMode('setup');
         };
 
         const handleLoadWrapper = (p) => {
@@ -880,38 +896,169 @@ const App = () => {
                         ) : (
                             <div className="grid gap-3">
                                 {savedProjects.map(p => (
-                                    <div key={p.id} onClick={() => handleLoadWrapper(p)} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex justify-between items-center cursor-pointer hover:border-blue-300 hover:shadow-md transition-all group">
-                                        <div className="flex items-center gap-4">
-                                            <div className="bg-blue-50 p-3 rounded-lg text-blue-600 text-xl">
-                                                {getTypeIcon(p.type)}
-                                            </div>
-                                            <div>
-                                                <h4 className="font-bold text-gray-800">{p.name}</h4>
-                                                <div className="flex flex-wrap gap-2 mt-1">
-                                                    <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">{p.type}</span>
-                                                    <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-bold">{p.totalMat}</span>
+                                    <div key={p.id} onClick={() => handleLoadWrapper(p)} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col cursor-pointer hover:border-blue-300 hover:shadow-md transition-all group">
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex items-center gap-4">
+                                                <div className="bg-blue-50 p-3 rounded-lg text-blue-600 text-xl">
+                                                    {getTypeIcon(p.type)}
                                                 </div>
-                                                <p className="text-[10px] text-gray-400 font-medium mt-1">{p.date}</p>
+                                                <div>
+                                                    <h4 className="font-bold text-gray-800">{p.name}</h4>
+                                                    <p className="text-[10px] text-gray-500 line-clamp-1">{p.description || "Aucune description"}</p>
+                                                    <div className="flex flex-wrap gap-2 mt-1">
+                                                        <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">{p.type}</span>
+                                                        <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-bold">{p.totalMat}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteProject(p.id);
+                                                    }}
+                                                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                                <ChevronRight size={18} className="text-gray-300 group-hover:text-blue-500" />
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteProject(p.id);
-                                                }}
-                                                className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                            <ChevronRight size={18} className="text-gray-300 group-hover:text-blue-500" />
-                                        </div>
+                                        {p.activeForms && p.activeForms.length > 0 && (
+                                            <div className="mt-3 pt-3 border-t border-gray-50 flex flex-wrap gap-1">
+                                                {p.activeForms.map(f => (
+                                                    <span key={f} className="text-[8px] bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded border border-slate-100 uppercase font-black tracking-wider">
+                                                        {f === 'semelles' ? 'Fondations' : f === 'murs' ? 'Élévation' : f}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <p className="text-[9px] text-gray-400 font-medium mt-3 text-right italic">{p.date}</p>
                                     </div>
                                 ))}
                             </div>
                         )}
 
                     </div>
+                </div>
+            );
+        }
+
+        // --- SETUP VIEW ---
+        if (viewMode === 'setup') {
+            const elementsList = [
+                { id: 'semelles', label: 'Fondations', icon: '🏗️' },
+                { id: 'poteaux', label: 'Poteaux', icon: '⚫' },
+                { id: 'poutres', label: 'Poutres', icon: '➖' },
+                { id: 'murs', label: 'Élévation / Murs', icon: '🧱' },
+                { id: 'dalles', label: 'Dalles Béton', icon: '⬜' },
+                { id: 'toiture', label: 'Toiture', icon: '🏠' }
+            ];
+
+            return (
+                <div className="p-4 space-y-6 pb-32 animate-in slide-in-from-right duration-300">
+                    <header className="flex items-center gap-4 mb-2">
+                        <button onClick={() => setViewMode('list')} className="p-2 hover:bg-gray-100 rounded-full text-gray-500">
+                            <ChevronLeft size={24} />
+                        </button>
+                        <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Configuration du Projet</h2>
+                    </header>
+
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-blue-600 tracking-widest block mb-2">Informations Générales</label>
+                            <div className="space-y-3">
+                                <input
+                                    type="text"
+                                    placeholder="Nom du projet (ex: Villa Moderne R+1)..."
+                                    className="w-full p-4 bg-gray-50 border-0 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                                    value={projectName}
+                                    onChange={(e) => setProjectName(e.target.value)}
+                                />
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                                            <Calendar size={16} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            className="w-full p-4 pl-12 bg-gray-50 border-0 rounded-xl text-xs font-bold outline-none"
+                                            value={projectDateTime}
+                                            onChange={(e) => setProjectDateTime(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <textarea
+                                    placeholder="Description du projet, adresse, notes..."
+                                    className="w-full p-4 bg-gray-50 border-0 rounded-xl text-sm min-h-[100px] outline-none"
+                                    value={projectDescription}
+                                    onChange={(e) => setProjectDescription(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-blue-600 tracking-widest block mb-3">Type de bâtiment</label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {buildingTypes.map(t => (
+                                    <button
+                                        key={t.id}
+                                        onClick={() => setProjectType(t.id)}
+                                        className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1 transition-all ${projectType === t.id
+                                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                            : 'border-gray-50 bg-gray-50 text-gray-500 grayscale'
+                                            }`}
+                                    >
+                                        <span className="text-2xl">{t.icon}</span>
+                                        <span className="text-[9px] font-black uppercase tracking-tighter">{t.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-blue-600 tracking-widest block mb-3">Éléments à inclure</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {elementsList.map(el => {
+                                    const isActive = activeConstructionForms.includes(el.id);
+                                    return (
+                                        <button
+                                            key={el.id}
+                                            onClick={() => {
+                                                if (isActive) {
+                                                    setActiveConstructionForms(activeConstructionForms.filter(id => id !== el.id));
+                                                } else {
+                                                    setActiveConstructionForms([...activeConstructionForms, el.id]);
+                                                }
+                                            }}
+                                            className={`p-3 rounded-xl border-2 flex items-center gap-3 transition-all ${isActive
+                                                ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                                                : 'border-gray-50 bg-gray-50 text-gray-500'
+                                                }`}
+                                        >
+                                            <div className={`w-5 h-5 rounded-md flex items-center justify-center border-2 transition-colors ${isActive ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-gray-200'}`}>
+                                                {isActive && <Plus size={14} className="rotate-45" />}
+                                                {!isActive && <Plus size={14} className="text-gray-200" />}
+                                            </div>
+                                            <div className="text-left">
+                                                <span className="text-sm block leading-none">{el.icon}</span>
+                                                <span className="text-[10px] font-black uppercase tracking-tighter">{el.label}</span>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={handleSaveWrapper}
+                        disabled={!projectName.trim()}
+                        className="w-full bg-blue-600 text-white p-5 rounded-2xl shadow-xl shadow-blue-200 font-black uppercase tracking-widest flex items-center justify-center gap-3 disabled:opacity-50 hover:bg-blue-700 active:scale-[0.98] transition-all"
+                    >
+                        <Save size={20} />
+                        Enregistrer le Projet
+                    </button>
                 </div>
             );
         }
