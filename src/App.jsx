@@ -2498,17 +2498,26 @@ const App = () => {
                 {/* Print Styles */}
                 <style>{`
                     @media print {
-                        .no-print { display: none !important; }
-                        body { background: white !important; padding: 0 !important; margin: 0 !important; }
+                        .no-print, nav, button, .floating-forum-button { display: none !important; }
+                        body, html { 
+                            background: white !important; 
+                            margin: 0 !important; 
+                            padding: 0 !important; 
+                            height: auto !important;
+                            overflow: visible !important;
+                        }
                         .printable-sheet { 
                             box-shadow: none !important; 
                             border: none !important; 
                             width: 100% !important; 
                             max-width: none !important;
-                            padding: 0 !important;
+                            margin: 0 !important;
+                            padding: 2px !important;
+                            visibility: visible !important;
+                            display: block !important;
                         }
-                        @page { margin: 2cm; }
-                        nav, button, footer { display: none !important; }
+                        @page { margin: 1.5cm; }
+                        * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; }
                     }
                 `}</style>
 
@@ -3570,7 +3579,7 @@ const App = () => {
             {/* Floating Forum Button */}
             <button
                 onClick={() => setActiveTab('forum')}
-                className={`fixed bottom-28 right-6 ${activeTab === 'forum'
+                className={`fixed bottom-28 right-6 no-print ${activeTab === 'forum'
                     ? 'bg-gradient-to-r from-purple-600 to-pink-600 scale-110'
                     : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:scale-105'
                     } text-white rounded-full w-14 h-14 flex items-center justify-center shadow-2xl transition-all duration-300 z-50 active:scale-95`}
